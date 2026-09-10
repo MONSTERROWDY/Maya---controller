@@ -1,4 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MAYA</string>
-    <string name="accessibility_description">MAYA phone assistant controls the visible screen after the user enables Accessibility.</string>
+    <string name="accessibility_description">
+        MAYA personal AI assistant can control visible phone UI after Accessibility is enabled.
+    </string>
 </resources>
