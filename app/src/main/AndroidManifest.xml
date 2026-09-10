@@ -1,56 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <queries>
-        <package android:name="com.google.android.youtube"/>
-        <package android:name="com.instagram.android"/>
-        <package android:name="com.facebook.katana"/>
-        <package android:name="com.whatsapp"/>
-        <package android:name="org.telegram.messenger"/>
-        <package android:name="com.android.chrome"/>
-        <package android:name="com.google.android.gm"/>
-        <package android:name="com.android.settings"/>
-        <package android:name="com.android.vending"/>
-    </queries>
-
-    <application
-        android:allowBackup="false"
-        android:label="MAYA Controller"
-        android:theme="@style/MayaTheme">
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-
-        <service
-            android:name=".MayaAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true"
-            android:enabled="true"
-            android:label="MAYA Accessibility Controller">
-
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
-            </intent-filter>
-
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/maya_accessibility_service"/>
-        </service>
-
-        <receiver
-            android:name=".MayaCommandReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="com.veer.maya.ACTION"/>
-            </intent-filter>
-        </receiver>
-
-    </application>
-
-</manifest>
+<uses-permission android:name="android.permission.INTERNET"/><uses-permission android:name="android.permission.RECORD_AUDIO"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+<queries><intent><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent></queries>
+<application android:allowBackup="false" android:label="MAYA" android:theme="@style/MayaTheme">
+<activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+<service android:name=".MayaAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true" android:enabled="true"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/maya_accessibility_service"/></service>
+<service android:name=".MayaVoiceService" android:exported="false" android:foregroundServiceType="microphone"/>
+<receiver android:name=".MayaCommandReceiver" android:exported="true"><intent-filter><action android:name="com.veer.maya.ACTION"/></intent-filter></receiver></application></manifest>
