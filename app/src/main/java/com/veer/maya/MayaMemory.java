@@ -1,3 +1,36 @@
 package com.veer.maya;
-import android.content.*;import org.json.*;
-public class MayaMemory{static final String P="maya_memory",H="h";public static void add(Context c,String r,String t){try{SharedPreferences p=c.getSharedPreferences(P,0);JSONArray a=new JSONArray(p.getString(H,"[]")),b=new JSONArray();for(int i=Math.max(0,a.length()-39);i<a.length();i++)b.put(a.get(i));JSONObject o=new JSONObject();o.put("role",r);o.put("text",t);b.put(o);p.edit().putString(H,b.toString()).apply();}catch(Exception e){}}public static String get(Context c){return c.getSharedPreferences(P,0).getString(H,"[]");}}
+
+import android.content.Context;
+import android.content.SharedPreferences;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+public final class MayaMemory {
+    private static final String PREFS = "maya_memory";
+    private static final String HISTORY = "history";
+    private static final int MAX = 40;
+    private MayaMemory() {}
+
+    public static synchronized void add(Context c, String role, String text) {
+        try {
+            SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            JSONArray old = new JSONArray(p.getString(HISTORY, "[]"));
+            JSONArray out = new JSONArray();
+            int start = Math.max(0, old.length() - MAX + 1);
+            for (int i = start; i < old.length(); i++) out.put(old.get(i));
+            JSONObject x = new JSONObject();
+            x.put("role", role);
+            x.put("text", text);
+            out.put(x);
+            p.edit().putString(HISTORY, out.toString()).apply();
+        } catch (Exception ignored) {}
+    }
+
+    public static String get(Context c) {
+        return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(HISTORY, "[]");
+    }
+
+    public static void clear(Context c) {
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(HISTORY).apply();
+    }
+}

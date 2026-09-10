@@ -1,6 +1,4 @@
 <resources>
-    <string name="app_name">MAYA Controller</string>
-    <string name="accessibility_description">
-        Allows MAYA to control the Android device using accessibility commands.
-    </string>
+    <string name="app_name">MAYA</string>
+    <string name="accessibility_description">MAYA phone assistant controls the visible screen after the user enables Accessibility.</string>
 </resources>

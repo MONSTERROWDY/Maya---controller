@@ -1,18 +1,50 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
- <uses-permission android:name="android.permission.INTERNET"/>
- <uses-permission android:name="android.permission.RECORD_AUDIO"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
- <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
- <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
- <application android:allowBackup="false" android:label="MAYA" android:theme="@style/MayaTheme">
-  <activity android:name=".MainActivity" android:exported="true">
-   <intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter>
-  </activity>
-  <service android:name=".MayaAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true" android:enabled="true">
-   <intent-filter><action android:name="android.accessibilityservice.AccessibilityService"/></intent-filter>
-   <meta-data android:name="android.accessibilityservice" android:resource="@xml/maya_accessibility_service"/>
-  </service>
-  <service android:name=".MayaVoiceService" android:exported="false" android:foregroundServiceType="microphone"/>
-  <receiver android:name=".MayaCommandReceiver" android:exported="true"><intent-filter><action android:name="com.veer.maya.ACTION"/><action android:name="com.veer.maya.REPLY"/></intent-filter></receiver>
- </application>
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:allowBackup="false"
+        android:label="MAYA"
+        android:theme="@style/MayaTheme"
+        android:supportsRtl="true">
+
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".MayaAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/maya_accessibility_service" />
+        </service>
+
+        <service
+            android:name=".MayaVoiceService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <receiver
+            android:name=".MayaCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.veer.maya.ACTION" />
+                <action android:name="com.veer.maya.REPLY" />
+                <action android:name="com.veer.maya.CONFIRM" />
+                <action android:name="com.veer.maya.CANCEL" />
+            </intent-filter>
+        </receiver>
+    </application>
 </manifest>
