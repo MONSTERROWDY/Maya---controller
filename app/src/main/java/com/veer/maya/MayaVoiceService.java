@@ -1,5 +1,7 @@
 package com.veer.maya;
 
+import android.content.pm.ServiceInfo;
+
 import android.app.*;
 import android.content.*;
 import android.content.pm.PackageManager;
