@@ -2,1788 +2,786 @@ package com.veer.maya;
 
 import android.Manifest;
 import android.app.Activity;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-
 import android.content.pm.PackageManager;
-
 import android.graphics.Color;
 import android.graphics.Typeface;
-
 import android.graphics.drawable.GradientDrawable;
-
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-
 import android.provider.Settings;
-
-import android.text.InputType;
-
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
-
-import android.view.inputmethod.EditorInfo;
-
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
-import android.widget.Space;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.Locale;
-
 public class MainActivity extends Activity {
 
-    private static final int BG =
-            Color.rgb(8,10,15);
+    private static final int BG = Color.rgb(248,249,252);
+    private static final int CARD = Color.WHITE;
+    private static final int TEXT = Color.rgb(25,28,35);
+    private static final int MUTED = Color.rgb(105,112,125);
+    private static final int GOLD = Color.rgb(190,140,35);
+    private static final int GREEN = Color.rgb(32,170,105);
+    private static final int BORDER = Color.rgb(225,228,235);
 
-    private static final int CARD =
-            Color.rgb(18,22,30);
-
-    private static final int CARD2 =
-            Color.rgb(24,29,39);
-
-    private static final int GOLD =
-            Color.rgb(245,185,66);
-
-    private static final int WHITE =
-            Color.rgb(245,247,250);
-
-    private static final int MUTED =
-            Color.rgb(160,168,180);
-
-    private static final int GREEN =
-            Color.rgb(60,210,135);
-
-    private static final int RED =
-            Color.rgb(240,95,105);
-
-    private LinearLayout root;
     private LinearLayout page;
-
     private TextView status;
-
     private EditText chatInput;
     private LinearLayout chatMessages;
-
     private BroadcastReceiver receiver;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState){
+    protected void onCreate(Bundle b) {
+        super.onCreate(b);
 
-        super.onCreate(savedInstanceState);
-
-        Window window = getWindow();
-
-        window.setStatusBarColor(
-                Color.rgb(10,13,18)
-        );
-
-        window.setNavigationBarColor(
-                Color.rgb(8,10,15)
-        );
+        Window w = getWindow();
+        w.setStatusBarColor(BG);
+        w.setNavigationBarColor(Color.WHITE);
 
         buildShell();
 
-        receiver =
-                new BroadcastReceiver(){
+        receiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context c, Intent i) {
+                if ("com.veer.maya.REPLY".equals(i.getAction())) {
+                    String s = i.getStringExtra("text");
+                    if (s != null) addChat(s, false);
+                }
+            }
+        };
 
-                    @Override
-                    public void onReceive(
-                            Context context,
-                            Intent intent
-                    ){
-
-                        if(
-                                "com.veer.maya.REPLY"
-                                        .equals(intent.getAction())
-                        ){
-
-                            String text =
-                                    intent.getStringExtra(
-                                            "text"
-                                    );
-
-                            if(text != null){
-
-                                addChat(
-                                        text,
-                                        false
-                                );
-                            }
-                        }
-                    }
-                };
-
-        registerReceiver(
-                receiver,
-                new IntentFilter(
-                        "com.veer.maya.REPLY"
-                ),
-                RECEIVER_NOT_EXPORTED
-        );
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(
+                    receiver,
+                    new IntentFilter("com.veer.maya.REPLY"),
+                    Context.RECEIVER_NOT_EXPORTED
+            );
+        } else {
+            registerReceiver(
+                    receiver,
+                    new IntentFilter("com.veer.maya.REPLY")
+            );
+        }
 
         requestPermissionsIfNeeded();
-
         showHome();
+
+        try {
+            MayaVoiceService.start(this);
+            new android.os.Handler().postDelayed(() ->
+                    MayaVoiceService.say(
+                            "Hello boss, कैसे हो आप? ठीक है ना?"
+                    ), 1400);
+        } catch (Exception ignored) {}
     }
 
-    private void buildShell(){
-
-        root =
-                new LinearLayout(this);
-
-        root.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        root.setBackgroundColor(
-                BG
-        );
-
+    private void buildShell() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(BG);
         setContentView(root);
 
-        LinearLayout header =
-                new LinearLayout(this);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setPadding(20,18,18,12);
 
-        header.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
+        LinearLayout brand = new LinearLayout(this);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
 
-        header.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
+        TextView mark = text("✦", 28, GOLD, true);
+        mark.setGravity(Gravity.CENTER);
+        mark.setBackground(round(Color.WHITE, 50, BORDER));
 
-        header.setPadding(
-                20,18,20,14
-        );
+        brand.addView(mark, new LinearLayout.LayoutParams(52,52));
 
-        TextView logo =
-                text(
-                        "MAYA",
-                        27,
-                        GOLD,
-                        true
-                );
+        LinearLayout names = new LinearLayout(this);
+        names.setOrientation(LinearLayout.VERTICAL);
+        names.setPadding(12,0,0,0);
 
-        header.addView(
-                logo,
-                new LinearLayout.LayoutParams(
-                        0,
-                        -2,
-                        1
-                )
-        );
+        TextView logo = text("MAYA", 24, TEXT, true);
+        TextView sub = text("AI PHONE AGENT", 10, MUTED, true);
 
-        status =
-                text(
-                        "● READY",
-                        11,
-                        MUTED,
-                        true
-                );
+        names.addView(logo);
+        names.addView(sub);
+        brand.addView(names);
 
         header.addView(
-                status
+                brand,
+                new LinearLayout.LayoutParams(0,-2,1)
         );
 
-        root.addView(
-                header
-        );
+        status = text("● READY", 11, GREEN, true);
+        header.addView(status);
 
-        page =
-                new LinearLayout(this);
+        root.addView(header);
 
-        page.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        page.setPadding(
-                16,4,16,10
-        );
+        page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(15,3,15,8);
 
         root.addView(
                 page,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
+                new LinearLayout.LayoutParams(-1,0,1)
         );
 
-        LinearLayout bottom =
-                new LinearLayout(this);
+        LinearLayout nav = new LinearLayout(this);
+        nav.setGravity(Gravity.CENTER);
+        nav.setPadding(8,8,8,10);
+        nav.setBackgroundColor(Color.WHITE);
 
-        bottom.setPadding(
-                10,8,10,12
-        );
+        Button home = navButton("⌂\nHOME");
+        Button chat = navButton("◉\nCHAT");
+        Button live = navButton("●\nLIVE");
+        Button settings = navButton("⋮\nMENU");
 
-        bottom.setGravity(
-                Gravity.CENTER
-        );
+        nav.addView(home, weight());
+        nav.addView(chat, weight());
+        nav.addView(live, weight());
+        nav.addView(settings, weight());
 
-        bottom.setBackgroundColor(
-                CARD
-        );
+        home.setOnClickListener(v -> showHome());
+        chat.setOnClickListener(v -> showChat());
+        live.setOnClickListener(v -> showLive());
+        settings.setOnClickListener(v -> showSettings());
 
-        Button home =
-                navButton("⌂\nHOME");
-
-        Button chat =
-                navButton("◉\nCHAT");
-
-        Button live =
-                navButton("◌\nLIVE");
-
-        Button settings =
-                navButton("⚙\nSETTINGS");
-
-        bottom.addView(
-                home,
-                weightParams()
-        );
-
-        bottom.addView(
-                chat,
-                weightParams()
-        );
-
-        bottom.addView(
-                live,
-                weightParams()
-        );
-
-        bottom.addView(
-                settings,
-                weightParams()
-        );
-
-        home.setOnClickListener(
-                v -> showHome()
-        );
-
-        chat.setOnClickListener(
-                v -> showChat()
-        );
-
-        live.setOnClickListener(
-                v -> showLive()
-        );
-
-        settings.setOnClickListener(
-                v -> showSettings()
-        );
-
-        root.addView(
-                bottom
-        );
+        root.addView(nav);
     }
 
-    private LinearLayout.LayoutParams weightParams(){
-
-        return new LinearLayout.LayoutParams(
-                0,
-                64,
-                1
-        );
+    private LinearLayout.LayoutParams weight() {
+        return new LinearLayout.LayoutParams(0,68,1);
     }
 
-    private void showHome(){
-
+    private void showHome() {
         page.removeAllViews();
 
-        ScrollView scroll =
-                new ScrollView(this);
+        ScrollView sc = new ScrollView(this);
+        LinearLayout c = vertical();
+        sc.addView(c);
+        page.addView(sc, new LinearLayout.LayoutParams(-1,-1));
 
-        LinearLayout content =
-                vertical();
+        space(c,15);
 
-        scroll.addView(
-                content
+        LinearLayout hero = card();
+        hero.setGravity(Gravity.CENTER);
+        hero.setPadding(20,24,20,24);
+
+        LinearLayout inner = vertical();
+        inner.setGravity(Gravity.CENTER);
+
+        TextView logo = text("✦",58,GOLD,true);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(round(Color.rgb(255,250,237),100,BORDER));
+
+        inner.addView(logo,new LinearLayout.LayoutParams(128,128));
+
+        space(inner,15);
+
+        TextView title = text(
+                "Hello boss 👋",
+                28,TEXT,true
+        );
+        title.setGravity(Gravity.CENTER);
+        inner.addView(title);
+
+        TextView greeting = text(
+                "कैसे हो आप? ठीक है ना?",
+                17,MUTED,false
+        );
+        greeting.setGravity(Gravity.CENTER);
+        inner.addView(greeting);
+
+        TextView desc = text(
+                "MAYA आपका personal AI phone agent है।\n"
+                + "आप बोलिए — MAYA समझेगी, plan बनाएगी और available Android controls से action करेगी।",
+                14,MUTED,false
+        );
+        desc.setGravity(Gravity.CENTER);
+        desc.setPadding(10,12,10,8);
+        inner.addView(desc);
+
+        hero.addView(inner);
+        c.addView(hero);
+
+        space(c,14);
+
+        LinearLayout actions = card();
+        TextView at = text("QUICK ACTIONS",13,MUTED,true);
+        actions.addView(at);
+
+        Button live = actionButton(
+                "🎙  Start Live Voice",
+                "बोलकर MAYA से काम करवाएँ"
+        );
+        Button chat = actionButton(
+                "💬  Open MAYA Chat",
+                "लिखकर command दें"
+        );
+        Button control = actionButton(
+                "📱  Enable Phone Control",
+                "Accessibility से phone control"
         );
 
-        page.addView(
-                scroll,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -1
-                )
-        );
+        live.setOnClickListener(v -> showLive());
+        chat.setOnClickListener(v -> showChat());
+        control.setOnClickListener(v -> openAccessibility());
 
-        Space top =
-                new Space(this);
+        actions.addView(live);
+        actions.addView(chat);
+        actions.addView(control);
 
-        content.addView(
-                top,
-                new LinearLayout.LayoutParams(
-                        1,
-                        20
-                )
-        );
+        c.addView(actions);
 
-        LinearLayout orb =
-                new LinearLayout(this);
+        space(c,14);
 
-        orb.setGravity(
-                Gravity.CENTER
-        );
-
-        TextView circle =
-                text(
-                        "M",
-                        54,
-                        GOLD,
-                        true
-                );
-
-        circle.setGravity(
-                Gravity.CENTER
-        );
-
-        circle.setBackground(
-                rounded(
-                        CARD2,
-                        200
-                )
-        );
-
-        orb.addView(
-                circle,
-                new LinearLayout.LayoutParams(
-                        138,
-                        138
-                )
-        );
-
-        content.addView(
-                orb
-        );
-
-        TextView title =
-                text(
-                        "Hello, I'm MAYA",
-                        27,
-                        WHITE,
-                        true
-                );
-
-        title.setGravity(
-                Gravity.CENTER
-        );
-
-        content.addView(
-                title
-        );
-
-        TextView subtitle =
-                text(
-                        "Your personal AI phone assistant",
-                        15,
-                        MUTED,
-                        false
-                );
-
-        subtitle.setGravity(
-                Gravity.CENTER
-        );
-
-        content.addView(
-                subtitle
-        );
-
-        Space gap =
-                new Space(this);
-
-        content.addView(
-                gap,
-                new LinearLayout.LayoutParams(
-                        1,
-                        24
-                )
-        );
-
-        LinearLayout statusCard =
-                card();
-
-        TextView st =
-                text(
-                        "SYSTEM STATUS",
-                        12,
-                        GOLD,
-                        true
-                );
-
-        statusCard.addView(
-                st
-        );
-
-        statusCard.addView(
-                text(
-                        getAccessStatus() +
-                                "\n" +
-                                getVoiceStatus() +
-                                "\n" +
-                                getApiStatus(),
-                        14,
-                        WHITE,
-                        false
-                )
-        );
-
-        content.addView(
-                statusCard
-        );
-
-        Space gap2 =
-                new Space(this);
-
-        content.addView(
-                gap2,
-                new LinearLayout.LayoutParams(
-                        1,
-                        14
-                )
-        );
-
-        Button start =
-                primaryButton(
-                        "🎙  START LIVE VOICE"
-                );
-
-        start.setOnClickListener(
-                v -> startLive()
-        );
-
-        content.addView(
-                start
-        );
-
-        Button openChat =
-                secondaryButton(
-                        "💬  OPEN MAYA CHAT"
-                );
-
-        openChat.setOnClickListener(
-                v -> showChat()
-        );
-
-        content.addView(
-                openChat
-        );
-
-        LinearLayout capabilities =
-                card();
-
+        LinearLayout capabilities = card();
         capabilities.addView(
-                text(
-                        "WHAT MAYA CAN DO",
-                        12,
-                        GOLD,
-                        true
-                )
+                text("MAYA CAPABILITIES",13,MUTED,true)
         );
 
-        capabilities.addView(
-                text(
-                        "• Natural AI conversation\n" +
-                        "• Hindi / English / Hinglish\n" +
-                        "• Maithili / Bhojpuri understanding\n" +
-                        "• Open apps and control visible UI\n" +
-                        "• Web search\n" +
-                        "• Voice conversation\n" +
-                        "• Persistent conversation memory\n" +
-                        "• Confirmation for sensitive actions",
-                        14,
-                        WHITE,
-                        false
-                )
-        );
+        String[] list = {
+                "✓ Hindi / English / Hinglish",
+                "✓ Maithili / Bhojpuri understanding",
+                "✓ App open और navigation",
+                "✓ Tap / click / type / scroll",
+                "✓ Web search और URLs",
+                "✓ Multi-step workflows",
+                "✓ Calls / messages — confirmation के साथ",
+                "✓ Persistent conversation memory",
+                "✓ Live voice assistant",
+                "✓ Accessibility phone control"
+        };
 
-        content.addView(
-                capabilities
-        );
+        for(String s:list) {
+            TextView t = text(s,14,TEXT,false);
+            t.setPadding(4,9,4,9);
+            capabilities.addView(t);
+        }
 
-        refreshStatus();
+        c.addView(capabilities);
     }
 
-    private void showChat(){
-
+    private void showChat() {
         page.removeAllViews();
 
-        LinearLayout wrapper =
-                vertical();
+        LinearLayout c = vertical();
 
-        page.addView(
-                wrapper
+        TextView title = text("MAYA CHAT",22,TEXT,true);
+        c.addView(title);
+
+        TextView sub = text(
+                "Natural language में command दें",
+                13,MUTED,false
+        );
+        c.addView(sub);
+
+        ScrollView sc = new ScrollView(this);
+        chatMessages = vertical();
+        chatMessages.setPadding(2,12,2,12);
+        sc.addView(chatMessages);
+
+        c.addView(
+                sc,
+                new LinearLayout.LayoutParams(-1,0,1)
         );
 
-        LinearLayout titleRow =
-                new LinearLayout(this);
+        LinearLayout inputRow = new LinearLayout(this);
+        inputRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        titleRow.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-        TextView title =
-                text(
-                        "MAYA CHAT",
-                        22,
-                        WHITE,
-                        true
-                );
-
-        titleRow.addView(
-                title,
-                new LinearLayout.LayoutParams(
-                        0,
-                        -2,
-                        1
-                )
-        );
-
-        TextView online =
-                text(
-                        "● AI",
-                        11,
-                        GREEN,
-                        true
-                );
-
-        titleRow.addView(
-                online
-        );
-
-        wrapper.addView(
-                titleRow
-        );
-
-        ScrollView scroll =
-                new ScrollView(this);
-
-        chatMessages =
-                new LinearLayout(this);
-
-        chatMessages.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        chatMessages.setPadding(
-                2,12,2,12
-        );
-
-        scroll.addView(
-                chatMessages
-        );
-
-        wrapper.addView(
-                scroll,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        0,
-                        1
-                )
-        );
-
-        loadHistory();
-
-        LinearLayout composer =
-                new LinearLayout(this);
-
-        composer.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-        composer.setPadding(
-                0,8,0,0
-        );
-
-        chatInput =
-                new EditText(this);
-
+        chatInput = new EditText(this);
+        chatInput.setHint("MAYA, क्या करना है?");
+        chatInput.setTextColor(TEXT);
+        chatInput.setHintTextColor(MUTED);
+        chatInput.setTextSize(15);
         chatInput.setSingleLine(false);
+        chatInput.setPadding(16,12,16,12);
+        chatInput.setBackground(round(Color.WHITE,22,BORDER));
 
-        chatInput.setMaxLines(4);
-
-        chatInput.setHint(
-                "Message MAYA..."
-        );
-
-        chatInput.setHintTextColor(
-                MUTED
-        );
-
-        chatInput.setTextColor(
-                WHITE
-        );
-
-        chatInput.setTextSize(
-                15
-        );
-
-        chatInput.setPadding(
-                18,12,18,12
-        );
-
-        chatInput.setInputType(
-                InputType.TYPE_CLASS_TEXT |
-                        InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        );
-
-        chatInput.setBackground(
-                rounded(
-                        CARD2,
-                        28
-                )
-        );
-
-        composer.addView(
+        inputRow.addView(
                 chatInput,
-                new LinearLayout.LayoutParams(
-                        0,
-                        60,
-                        1
-                )
+                new LinearLayout.LayoutParams(0,58,1)
         );
 
-        Button send =
-                primarySmallButton(
-                        "➤"
-                );
+        Button send = new Button(this);
+        send.setText("SEND");
+        send.setTextColor(Color.WHITE);
+        send.setTextSize(12);
+        send.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        send.setBackground(round(GOLD,20,GOLD));
 
-        composer.addView(
-                send,
-                new LinearLayout.LayoutParams(
-                        58,
-                        60
-                )
+        LinearLayout.LayoutParams sp =
+                new LinearLayout.LayoutParams(92,58);
+        sp.setMargins(8,0,0,0);
+        inputRow.addView(send,sp);
+
+        send.setOnClickListener(v -> sendChat());
+
+        c.addView(inputRow);
+        page.addView(c);
+
+        addChat(
+                "Hello boss. बताइए क्या करना है?",
+                false
         );
-
-        send.setOnClickListener(
-                v -> sendMessage()
-        );
-
-        chatInput.setOnEditorActionListener(
-                (v, actionId, event) -> {
-
-                    if(
-                            actionId ==
-                                    EditorInfo.IME_ACTION_SEND
-                    ){
-
-                        sendMessage();
-
-                        return true;
-                    }
-
-                    return false;
-                }
-        );
-
-        wrapper.addView(
-                composer
-        );
-
-        refreshStatus();
     }
 
-    private void loadHistory(){
+    private void sendChat() {
+        if(chatInput == null) return;
 
-        if(chatMessages == null)
-            return;
+        String q = chatInput.getText().toString().trim();
+        if(q.isEmpty()) return;
 
-        try{
+        addChat(q,true);
+        chatInput.setText("");
 
-            JSONArray history =
-                    new JSONArray(
-                            MayaMemory.get(this)
-                    );
+        status.setText("● THINKING");
+        status.setTextColor(GOLD);
 
-            if(history.length() == 0){
+        MayaCore.process(this,q);
+    }
 
-                addChat(
-                        "नमस्ते! मैं MAYA हूँ। आप मुझसे naturally बात कर सकते हैं.",
-                        false
-                );
+    private void addChat(String s, boolean user) {
+        if(chatMessages == null) return;
 
+        TextView t = text(
+                (user ? "YOU\n" : "MAYA\n") + s,
+                15,
+                user ? TEXT : TEXT,
+                false
+        );
+
+        t.setPadding(15,13,15,13);
+        t.setBackground(
+                round(
+                        user ? Color.rgb(242,243,246) : Color.WHITE,
+                        20,
+                        BORDER
+                )
+        );
+
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(-1,-2);
+        p.setMargins(0,5,0,5);
+
+        chatMessages.addView(t,p);
+    }
+
+    private void showLive() {
+        page.removeAllViews();
+
+        LinearLayout c = vertical();
+        c.setGravity(Gravity.CENTER_HORIZONTAL);
+
+        space(c,30);
+
+        TextView logo = text("✦",60,GOLD,true);
+        logo.setGravity(Gravity.CENTER);
+        logo.setBackground(round(Color.WHITE,100,BORDER));
+
+        c.addView(logo,new LinearLayout.LayoutParams(150,150));
+
+        space(c,20);
+
+        TextView title = text("MAYA LIVE",30,TEXT,true);
+        title.setGravity(Gravity.CENTER);
+        c.addView(title);
+
+        TextView desc = text(
+                "Live voice mode active\n"
+                + "आप normal conversation की तरह MAYA से बात कर सकते हैं।",
+                15,MUTED,false
+        );
+        desc.setGravity(Gravity.CENTER);
+        desc.setPadding(10,12,10,25);
+        c.addView(desc);
+
+        Button start = actionButton(
+                "🎙  START / RESUME LISTENING",
+                "MAYA voice commands सुनेगी"
+        );
+
+        Button stop = actionButton(
+                "⏹  STOP LIVE MODE",
+                "Voice service बंद करें"
+        );
+
+        start.setOnClickListener(v -> {
+            MayaVoiceService.setLiveMode(this,true);
+            MayaVoiceService.start(this);
+            MayaVoiceService.say(
+                    "हाँ boss, मैं सुन रही हूँ। बोलिए।"
+            );
+            Toast.makeText(
+                    this,
+                    "MAYA Live ON",
+                    Toast.LENGTH_SHORT
+            ).show();
+        });
+
+        stop.setOnClickListener(v -> {
+            MayaVoiceService.setLiveMode(this,false);
+            Toast.makeText(
+                    this,
+                    "Live mode OFF",
+                    Toast.LENGTH_SHORT
+            ).show();
+        });
+
+        c.addView(start);
+        c.addView(stop);
+
+        space(c,20);
+
+        LinearLayout info = card();
+        info.addView(text(
+                "EXAMPLE COMMANDS",
+                13,MUTED,true
+        ));
+
+        String[] examples = {
+                "“MAYA YouTube खोलो”",
+                "“MAYA Google पर Bitcoin price search करो”",
+                "“MAYA Chrome खोलो और ये चीज search करो”",
+                "“MAYA वापस जाओ”",
+                "“MAYA नीचे scroll करो”",
+                "“MAYA आज ये करना है...”"
+        };
+
+        for(String e:examples)
+            info.addView(text(e,14,TEXT,false));
+
+        c.addView(info);
+
+        page.addView(c);
+    }
+
+    private void showSettings() {
+        page.removeAllViews();
+
+        ScrollView sc = new ScrollView(this);
+        LinearLayout c = vertical();
+        sc.addView(c);
+        page.addView(sc);
+
+        c.addView(text("MAYA SETTINGS",25,TEXT,true));
+        c.addView(text(
+                "Assistant को अपने हिसाब से configure करें",
+                13,MUTED,false
+        ));
+
+        space(c,12);
+
+        LinearLayout ai = card();
+
+        ai.addView(text(
+                "AI MODEL & API",
+                13,MUTED,true
+        ));
+
+        EditText key = new EditText(this);
+        key.setHint("OpenAI API key");
+        key.setSingleLine(true);
+        key.setTextColor(TEXT);
+        key.setHintTextColor(MUTED);
+        key.setInputType(
+                android.text.InputType.TYPE_CLASS_TEXT |
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        );
+        key.setPadding(15,10,15,10);
+        key.setBackground(round(Color.WHITE,18,BORDER));
+
+        String saved = MayaCore.getKey(this);
+        if(saved != null) key.setText(saved);
+
+        ai.addView(key);
+
+        EditText model = new EditText(this);
+        model.setHint("AI model");
+        model.setSingleLine(true);
+        model.setTextColor(TEXT);
+        model.setHintTextColor(MUTED);
+        model.setPadding(15,10,15,10);
+        model.setBackground(round(Color.WHITE,18,BORDER));
+
+        model.setText(MayaCore.getModel(this));
+        ai.addView(model);
+
+        Button save = actionButton(
+                "🔐 SAVE AI CONNECTION",
+                "API key phone में local save होगी"
+        );
+
+        save.setOnClickListener(v -> {
+            String k = key.getText().toString().trim();
+            String m = model.getText().toString().trim();
+
+            if(k.isEmpty()) {
+                Toast.makeText(
+                        this,
+                        "API key डालिए",
+                        Toast.LENGTH_SHORT
+                ).show();
                 return;
             }
 
-            for(int i=0;
-                i<history.length();
-                i++){
+            MayaCore.saveKey(this,k);
+            if(!m.isEmpty()) MayaCore.saveModel(this,m);
 
-                JSONObject item =
-                        history.optJSONObject(i);
+            Toast.makeText(
+                    this,
+                    "AI connection saved",
+                    Toast.LENGTH_SHORT
+            ).show();
+        });
 
-                if(item == null)
-                    continue;
+        ai.addView(save);
+        c.addView(ai);
 
-                String role =
-                        item.optString(
-                                "role"
-                        );
+        space(c,12);
 
-                String value =
-                        item.optString(
-                                "text"
-                        );
+        settingCard(
+                c,
+                "👤 PROFILE SETTINGS",
+                "Boss profile और assistant identity"
+        );
 
-                if(
-                        "user".equals(role) ||
-                        "assistant".equals(role)
-                ){
+        settingCard(
+                c,
+                "💬 CHAT SETTINGS",
+                "Conversation और response preferences"
+        );
 
-                    addChat(
-                            value,
-                            "user".equals(role)
-                    );
-                }
-            }
+        settingCard(
+                c,
+                "🎙 VOICE SETTINGS",
+                "Live voice, language और speech"
+        );
 
-        }catch(Exception e){
+        settingCard(
+                c,
+                "🧠 MEMORY",
+                "MAYA की persistent conversation memory"
+        );
 
-            addChat(
-                    "MAYA ready. बताइए क्या करना है?",
-                    false
+        settingCard(
+                c,
+                "🔌 API & CONNECTIONS",
+                "AI API और external integrations"
+        );
+
+        settingCard(
+                c,
+                "🧩 PLUGINS",
+                "Canva, GitHub और future integrations"
+        );
+
+        Button accessibility = actionButton(
+                "📱 PHONE CONTROL",
+                "Android Accessibility permission खोलें"
+        );
+        accessibility.setOnClickListener(
+                v -> openAccessibility()
+        );
+        c.addView(accessibility);
+
+        settingCard(
+                c,
+                "🔔 NOTIFICATIONS",
+                "MAYA notification behaviour"
+        );
+
+        settingCard(
+                c,
+                "🎨 APPEARANCE",
+                "Light interface और visual preferences"
+        );
+
+        settingCard(
+                c,
+                "🌐 LANGUAGE",
+                "Hindi / English / Hinglish / regional language"
+        );
+
+        settingCard(
+                c,
+                "🔒 PRIVACY & SECURITY",
+                "Permissions और confirmation controls"
+        );
+
+        settingCard(
+                c,
+                "ℹ ABOUT MAYA",
+                "MAYA personal Android AI agent"
+        );
+
+        space(c,20);
+    }
+
+    private void settingCard(
+            LinearLayout parent,
+            String title,
+            String subtitle
+    ) {
+        LinearLayout box = card();
+
+        TextView a = text(title,15,TEXT,true);
+        TextView b = text(subtitle,12,MUTED,false);
+
+        box.addView(a);
+        box.addView(b);
+
+        parent.addView(box);
+        space(parent,8);
+    }
+
+    private void openAccessibility() {
+        try {
+            startActivity(
+                    new Intent(
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    )
             );
+        } catch(Exception e) {
+            Toast.makeText(
+                    this,
+                    "Accessibility settings नहीं खुलीं",
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
-    private void sendMessage(){
-
-        if(chatInput == null)
-            return;
-
-        String value =
-                chatInput
-                        .getText()
-                        .toString()
-                        .trim();
-
-        if(value.isEmpty())
-            return;
-
-        addChat(
-                value,
-                true
-        );
-
-        chatInput.setText("");
-
-        MayaCore.process(
-                this,
-                value
-        );
-    }
-
-    private void addChat(
-            String value,
-            boolean user
-    ){
-
-        if(chatMessages == null)
-            return;
-
-        LinearLayout row =
-                new LinearLayout(this);
-
-        row.setGravity(
-                user
-                        ? Gravity.END
-                        : Gravity.START
-        );
-
-        TextView bubble =
-                text(
-                        value,
-                        15,
-                        WHITE,
-                        false
-                );
-
-        bubble.setPadding(
-                17,13,17,13
-        );
-
-        bubble.setBackground(
-                rounded(
-                        user
-                                ? Color.rgb(43,47,58)
-                                : Color.rgb(23,29,38),
-                        24
-                )
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        user
-                                ? (int)(getResources()
-                                .getDisplayMetrics()
-                                .widthPixels * 0.78)
-                                : (int)(getResources()
-                                .getDisplayMetrics()
-                                .widthPixels * 0.88),
-                        -2
-                );
-
-        params.setMargins(
-                0,5,0,5
-        );
-
-        row.addView(
-                bubble,
-                params
-        );
-
-        chatMessages.addView(
-                row
-        );
-    }
-
-    private void showLive(){
-
-        page.removeAllViews();
-
-        ScrollView scroll =
-                new ScrollView(this);
-
-        LinearLayout content =
-                vertical();
-
-        scroll.addView(
-                content
-        );
-
-        page.addView(
-                scroll
-        );
-
-        TextView title =
-                text(
-                        "LIVE VOICE",
-                        24,
-                        WHITE,
-                        true
-                );
-
-        title.setGravity(
-                Gravity.CENTER
-        );
-
-        content.addView(
-                title
-        );
-
-        TextView subtitle =
-                text(
-                        "Natural voice conversation with MAYA",
-                        14,
-                        MUTED,
-                        false
-                );
-
-        subtitle.setGravity(
-                Gravity.CENTER
-        );
-
-        content.addView(
-                subtitle
-        );
-
-        Space space =
-                new Space(this);
-
-        content.addView(
-                space,
-                new LinearLayout.LayoutParams(
-                        1,
-                        22
-                )
-        );
-
-        LinearLayout orb =
-                new LinearLayout(this);
-
-        orb.setGravity(
-                Gravity.CENTER
-        );
-
-        TextView m =
-                text(
-                        "M",
-                        62,
-                        GOLD,
-                        true
-                );
-
-        m.setGravity(
-                Gravity.CENTER
-        );
-
-        m.setBackground(
-                rounded(
-                        CARD2,
-                        200
-                )
-        );
-
-        orb.addView(
-                m,
-                new LinearLayout.LayoutParams(
-                        170,
-                        170
-                )
-        );
-
-        content.addView(
-                orb
-        );
-
-        TextView state =
-                text(
-                        MayaVoiceService.me != null
-                                ? "● LISTENING"
-                                : "● STANDBY",
-                        15,
-                        MayaVoiceService.me != null
-                                ? GREEN
-                                : MUTED,
-                        true
-                );
-
-        state.setGravity(
-                Gravity.CENTER
-        );
-
-        content.addView(
-                state
-        );
-
-        Space s2 =
-                new Space(this);
-
-        content.addView(
-                s2,
-                new LinearLayout.LayoutParams(
-                        1,
-                        20
-                )
-        );
-
-        Button start =
-                primaryButton(
-                        MayaVoiceService.me == null
-                                ? "🎙  START VOICE"
-                                : "■  STOP VOICE"
-                );
-
-        start.setOnClickListener(
-                v -> {
-
-                    if(MayaVoiceService.me == null){
-
-                        startLive();
-
-                    }else{
-
-                        MayaVoiceService.stop(
-                                this
-                        );
-
-                        showLive();
-                    }
-                }
-        );
-
-        content.addView(
-                start
-        );
-
-        Button mode =
-                secondaryButton(
-                        MayaVoiceService
-                                .isLiveMode(this)
-                                ? "LIVE MODE • ON"
-                                : "WAKE WORD MODE • ON"
-                );
-
-        mode.setOnClickListener(
-                v -> {
-
-                    MayaVoiceService.setLiveMode(
-                            this,
-                            !MayaVoiceService
-                                    .isLiveMode(this)
-                    );
-
-                    showLive();
-                }
-        );
-
-        content.addView(
-                mode
-        );
-
-        LinearLayout languages =
-                card();
-
-        languages.addView(
-                text(
-                        "LANGUAGES",
-                        12,
-                        GOLD,
-                        true
-                )
-        );
-
-        languages.addView(
-                text(
-                        "Hindi • English • Hinglish\n" +
-                        "Maithili • Bhojpuri",
-                        15,
-                        WHITE,
-                        false
-                )
-        );
-
-        content.addView(
-                languages
-        );
-
-        refreshStatus();
-    }
-
-    private void showSettings(){
-
-        page.removeAllViews();
-
-        ScrollView scroll =
-                new ScrollView(this);
-
-        LinearLayout content =
-                vertical();
-
-        scroll.addView(
-                content
-        );
-
-        page.addView(
-                scroll
-        );
-
-        content.addView(
-                text(
-                        "SETTINGS",
-                        25,
-                        WHITE,
-                        true
-                )
-        );
-
-        content.addView(
-                text(
-                        "Configure MAYA once. Settings stay on this phone.",
-                        14,
-                        MUTED,
-                        false
-                )
-        );
-
-        LinearLayout apiCard =
-                card();
-
-        apiCard.addView(
-                text(
-                        "AI CONNECTION",
-                        12,
-                        GOLD,
-                        true
-                )
-        );
-
-        apiCard.addView(
-                text(
-                        "OpenAI API key",
-                        14,
-                        WHITE,
-                        true
-                )
-        );
-
-        EditText key =
-                new EditText(this);
-
-        key.setSingleLine(true);
-
-        key.setText(
-                MayaCore.getKey(this)
-        );
-
-        key.setHint(
-                "Paste your OpenAI API key"
-        );
-
-        key.setHintTextColor(
-                MUTED
-        );
-
-        key.setTextColor(
-                WHITE
-        );
-
-        key.setInputType(
-                InputType.TYPE_CLASS_TEXT |
-                        InputType.TYPE_TEXT_VARIATION_PASSWORD
-        );
-
-        key.setPadding(
-                16,12,16,12
-        );
-
-        key.setBackground(
-                rounded(
-                        CARD2,
-                        18
-                )
-        );
-
-        apiCard.addView(
-                key,
-                new LinearLayout.LayoutParams(
-                        -1,
-                        58
-                )
-        );
-
-        Button save =
-                primaryButton(
-                        "SAVE API KEY"
-                );
-
-        save.setOnClickListener(
-                v -> {
-
-                    String value =
-                            key.getText()
-                                    .toString()
-                                    .trim();
-
-                    if(value.isEmpty()){
-
-                        Toast.makeText(
-                                this,
-                                "API key खाली है",
-                                Toast.LENGTH_SHORT
-                        ).show();
-
-                        return;
-                    }
-
-                    MayaCore.saveKey(
-                            this,
-                            value
-                    );
-
-                    Toast.makeText(
-                            this,
-                            "✅ API key saved on this phone",
-                            Toast.LENGTH_SHORT
-                    ).show();
-
-                    refreshStatus();
-                }
-        );
-
-        apiCard.addView(
-                save
-        );
-
-        Button test =
-                secondaryButton(
-                        "TEST API CONNECTION"
-                );
-
-        test.setOnClickListener(
-                v -> MayaCore.testKey(this)
-        );
-
-        apiCard.addView(
-                test
-        );
-
-        apiCard.addView(
-                text(
-                        "Your API key is stored locally in the app. Never put it in GitHub code.",
-                        12,
-                        MUTED,
-                        false
-                )
-        );
-
-        content.addView(
-                apiCard
-        );
-
-        LinearLayout phoneCard =
-                card();
-
-        phoneCard.addView(
-                text(
-                        "PHONE CONTROL",
-                        12,
-                        GOLD,
-                        true
-                )
-        );
-
-        Button access =
-                secondaryButton(
-                        getAccessStatus()
-                );
-
-        access.setOnClickListener(
-                v -> startActivity(
-                        new Intent(
-                                Settings.ACTION_ACCESSIBILITY_SETTINGS
-                        )
-                )
-        );
-
-        phoneCard.addView(
-                access
-        );
-
-        Button mic =
-                secondaryButton(
-                        "MICROPHONE PERMISSION"
-                );
-
-        mic.setOnClickListener(
-                v -> requestMicrophone()
-        );
-
-        phoneCard.addView(
-                mic
-        );
-
-        content.addView(
-                phoneCard
-        );
-
-        LinearLayout memoryCard =
-                card();
-
-        memoryCard.addView(
-                text(
-                        "MEMORY",
-                        12,
-                        GOLD,
-                        true
-                )
-        );
-
-        Button clear =
-                secondaryButton(
-                        "CLEAR CONVERSATION MEMORY"
-                );
-
-        clear.setOnClickListener(
-                v -> {
-
-                    MayaMemory.clear(
-                            this
-                    );
-
-                    Toast.makeText(
-                            this,
-                            "Memory cleared",
-                            Toast.LENGTH_SHORT
-                    ).show();
-                }
-        );
-
-        memoryCard.addView(
-                clear
-        );
-
-        content.addView(
-                memoryCard
-        );
-
-        LinearLayout about =
-                card();
-
-        about.addView(
-                text(
-                        "MAYA",
-                        18,
-                        GOLD,
-                        true
-                )
-        );
-
-        about.addView(
-                text(
-                        "Personal AI • Voice • Memory • Phone Agent\n\n" +
-                        "MAYA can work with Android Accessibility and available Android APIs. " +
-                        "Android security restrictions still apply.",
-                        13,
-                        MUTED,
-                        false
-                )
-        );
-
-        content.addView(
-                about
-        );
-
-        refreshStatus();
-    }
-
-    private void startLive(){
-
-        if(
-                Build.VERSION.SDK_INT >= 23 &&
-                checkSelfPermission(
-                        Manifest.permission.RECORD_AUDIO
-                ) != PackageManager.PERMISSION_GRANTED
-        ){
-
-            requestMicrophone();
-
-            return;
-        }
-
-        MayaVoiceService.setLiveMode(
-                this,
-                true
-        );
-
-        MayaVoiceService.start(
-                this
-        );
-
-        showLive();
-    }
-
-    private void requestMicrophone(){
-
-        if(
-                Build.VERSION.SDK_INT >= 23
-        ){
-
-            if(
-                    checkSelfPermission(
-                            Manifest.permission.RECORD_AUDIO
-                    ) != PackageManager.PERMISSION_GRANTED
-            ){
-
+    private void requestPermissionsIfNeeded() {
+        if(Build.VERSION.SDK_INT >= 23) {
+            if(checkSelfPermission(
+                    Manifest.permission.RECORD_AUDIO
+            ) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(
                         new String[]{
                                 Manifest.permission.RECORD_AUDIO
-                        },
-                        100
+                        },100
                 );
+            }
+        }
 
-            }else{
-
-                Toast.makeText(
-                        this,
-                        "Microphone permission already enabled",
-                        Toast.LENGTH_SHORT
-                ).show();
+        if(Build.VERSION.SDK_INT >= 33) {
+            if(checkSelfPermission(
+                    Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(
+                        new String[]{
+                                Manifest.permission.POST_NOTIFICATIONS
+                        },101
+                );
             }
         }
     }
 
-    private void requestPermissionsIfNeeded(){
-
-        requestMicrophone();
-
-        if(
-                Build.VERSION.SDK_INT >= 33 &&
-                checkSelfPermission(
-                        Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-        ){
-
-            requestPermissions(
-                    new String[]{
-                            Manifest.permission.POST_NOTIFICATIONS
-                    },
-                    101
-            );
-        }
+    private LinearLayout vertical() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        return l;
     }
 
-    private String getAccessStatus(){
+    private LinearLayout card() {
+        LinearLayout l = vertical();
+        l.setPadding(16,15,16,15);
+        l.setBackground(round(CARD,22,BORDER));
 
-        String enabled =
-                Settings.Secure.getString(
-                        getContentResolver(),
-                        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-                );
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(-1,-2);
+        p.setMargins(0,5,0,5);
 
-        boolean on =
-                enabled != null &&
-                enabled.toLowerCase(
-                        Locale.US
-                ).contains(
-                        getPackageName()
-                                .toLowerCase(Locale.US)
-                );
-
-        return on
-                ? "● Accessibility ON"
-                : "● Accessibility OFF";
+        l.setLayoutParams(p);
+        return l;
     }
 
-    private String getVoiceStatus(){
+    private Button actionButton(
+            String title,
+            String subtitle
+    ) {
+        Button b = new Button(this);
+        b.setText(title + "\n" + subtitle);
+        b.setTextSize(13);
+        b.setTextColor(TEXT);
+        b.setGravity(Gravity.CENTER_VERTICAL|Gravity.LEFT);
+        b.setAllCaps(false);
+        b.setPadding(15,5,15,5);
+        b.setBackground(round(
+                Color.rgb(249,250,252),
+                18,
+                BORDER
+        ));
 
-        return MayaVoiceService.me != null
-                ? "● Voice service ON"
-                : "● Voice service OFF";
+        LinearLayout.LayoutParams p =
+                new LinearLayout.LayoutParams(-1,65);
+        p.setMargins(0,5,0,5);
+        b.setLayoutParams(p);
+
+        return b;
     }
 
-    private String getApiStatus(){
-
-        return MayaCore.hasKey(this)
-                ? "● AI API KEY SAVED"
-                : "● AI API KEY NOT SET";
-    }
-
-    private void refreshStatus(){
-
-        if(status == null)
-            return;
-
-        boolean api =
-                MayaCore.hasKey(this);
-
-        boolean access =
-                getAccessStatus()
-                        .contains("ON");
-
-        status.setText(
-                "● " +
-                        (api && access
-                                ? "READY"
-                                : "SETUP")
-        );
-
-        status.setTextColor(
-                api && access
-                        ? GREEN
-                        : GOLD
-        );
-    }
-
-    private LinearLayout vertical(){
-
-        LinearLayout layout =
-                new LinearLayout(this);
-
-        layout.setOrientation(
-                LinearLayout.VERTICAL
-        );
-
-        return layout;
-    }
-
-    private LinearLayout card(){
-
-        LinearLayout layout =
-                vertical();
-
-        layout.setPadding(
-                18,17,18,17
-        );
-
-        layout.setBackground(
-                rounded(
-                        CARD,
-                        24
-                )
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        -2
-                );
-
-        params.setMargins(
-                0,7,0,7
-        );
-
-        layout.setLayoutParams(
-                params
-        );
-
-        return layout;
+    private Button navButton(String s) {
+        Button b = new Button(this);
+        b.setText(s);
+        b.setTextSize(10);
+        b.setTextColor(TEXT);
+        b.setGravity(Gravity.CENTER);
+        b.setAllCaps(false);
+        b.setBackgroundColor(Color.TRANSPARENT);
+        return b;
     }
 
     private TextView text(
-            String value,
+            String s,
             float size,
             int color,
             boolean bold
-    ){
-
-        TextView view =
-                new TextView(this);
-
-        view.setText(
-                value
-        );
-
-        view.setTextSize(
-                size
-        );
-
-        view.setTextColor(
-                color
-        );
-
-        view.setPadding(
-                0,4,0,4
-        );
-
-        if(bold){
-
-            view.setTypeface(
-                    Typeface.DEFAULT,
-                    Typeface.BOLD
-            );
-        }
-
-        return view;
-    }
-
-    private Button navButton(
-            String label
-    ){
-
-        Button button =
-                new Button(this);
-
-        button.setText(
-                label
-        );
-
-        button.setTextSize(
-                10
-        );
-
-        button.setTextColor(
-                WHITE
-        );
-
-        button.setAllCaps(
-                false
-        );
-
-        button.setGravity(
-                Gravity.CENTER
-        );
-
-        button.setBackground(
-                rounded(
-                        CARD,
-                        18
-                )
-        );
-
-        return button;
-    }
-
-    private Button primaryButton(
-            String label
-    ){
-
-        Button button =
-                new Button(this);
-
-        button.setText(
-                label
-        );
-
-        button.setTextSize(
-                13
-        );
-
-        button.setTextColor(
-                Color.rgb(20,20,20)
-        );
-
-        button.setTypeface(
+    ) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        t.setTextColor(color);
+        t.setTypeface(
                 Typeface.DEFAULT,
-                Typeface.BOLD
+                bold ? Typeface.BOLD : Typeface.NORMAL
         );
-
-        button.setAllCaps(
-                false
-        );
-
-        button.setGravity(
-                Gravity.CENTER
-        );
-
-        button.setBackground(
-                rounded(
-                        GOLD,
-                        20
-                )
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        58
-                );
-
-        params.setMargins(
-                0,6,0,6
-        );
-
-        button.setLayoutParams(
-                params
-        );
-
-        return button;
+        return t;
     }
 
-    private Button secondaryButton(
-            String label
-    ){
-
-        Button button =
-                new Button(this);
-
-        button.setText(
-                label
-        );
-
-        button.setTextSize(
-                12
-        );
-
-        button.setTextColor(
-                WHITE
-        );
-
-        button.setAllCaps(
-                false
-        );
-
-        button.setGravity(
-                Gravity.CENTER
-        );
-
-        button.setBackground(
-                rounded(
-                        CARD2,
-                        20
-                )
-        );
-
-        LinearLayout.LayoutParams params =
-                new LinearLayout.LayoutParams(
-                        -1,
-                        56
-                );
-
-        params.setMargins(
-                0,5,0,5
-        );
-
-        button.setLayoutParams(
-                params
-        );
-
-        return button;
-    }
-
-    private Button primarySmallButton(
-            String label
-    ){
-
-        Button button =
-                new Button(this);
-
-        button.setText(
-                label
-        );
-
-        button.setTextSize(
-                19
-        );
-
-        button.setTextColor(
-                Color.rgb(20,20,20)
-        );
-
-        button.setAllCaps(
-                false
-        );
-
-        button.setBackground(
-                rounded(
-                        GOLD,
-                        22
-                )
-        );
-
-        return button;
-    }
-
-    private GradientDrawable rounded(
+    private GradientDrawable round(
             int color,
-            float radius
-    ){
+            float radius,
+            int stroke
+    ) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(radius);
+        g.setStroke(1,stroke);
+        return g;
+    }
 
-        GradientDrawable drawable =
-                new GradientDrawable();
-
-        drawable.setColor(
-                color
+    private void space(LinearLayout l,int h) {
+        View v = new View(this);
+        l.addView(
+                v,
+                new LinearLayout.LayoutParams(1,h)
         );
-
-        drawable.setCornerRadius(
-                radius
-        );
-
-        return drawable;
     }
 
     @Override
-    protected void onResume(){
-
-        super.onResume();
-
-        refreshStatus();
-    }
-
-    @Override
-    protected void onDestroy(){
-
-        try{
-
-            unregisterReceiver(
-                    receiver
-            );
-
-        }catch(Exception ignored){}
-
+    protected void onDestroy() {
+        try {
+            unregisterReceiver(receiver);
+        } catch(Exception ignored) {}
         super.onDestroy();
     }
 }

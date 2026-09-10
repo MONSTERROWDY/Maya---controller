@@ -1,498 +1,498 @@
 package com.veer.maya;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.AccessibilityServiceInfo;
-
+import android.accessibilityservice.GestureDescription;
+import android.content.Context;
 import android.content.Intent;
-
-import android.graphics.Color;
+import android.graphics.Path;
 import android.graphics.PixelFormat;
-
-import android.os.Bundle;
-import android.os.Handler;
-
+import android.os.Build;
 import android.view.Gravity;
 import android.view.WindowManager;
-
-import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-
 import android.widget.TextView;
-import android.widget.Toast;
+import android.graphics.drawable.GradientDrawable;
 
-import java.util.List;
-import java.util.Locale;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MayaAccessibilityService
         extends AccessibilityService {
 
-    private static MayaAccessibilityService instance;
+    public static MayaAccessibilityService instance;
 
-    private WindowManager windowManager;
+    private WindowManager wm;
     private TextView bubble;
 
-    public static MayaAccessibilityService getInstance(){
-        return instance;
+    private static final Map<String,String> APPS =
+            new HashMap<>();
+
+    static {
+        APPS.put("youtube","com.google.android.youtube");
+        APPS.put("यूट्यूब","com.google.android.youtube");
+
+        APPS.put("chrome","com.android.chrome");
+        APPS.put("क्रोम","com.android.chrome");
+
+        APPS.put("whatsapp","com.whatsapp");
+        APPS.put("व्हाट्सएप","com.whatsapp");
+
+        APPS.put("telegram","org.telegram.messenger");
+        APPS.put("टेलीग्राम","org.telegram.messenger");
+
+        APPS.put("instagram","com.instagram.android");
+        APPS.put("इंस्टाग्राम","com.instagram.android");
+
+        APPS.put("facebook","com.facebook.katana");
+        APPS.put("फेसबुक","com.facebook.katana");
+
+        APPS.put("gmail","com.google.android.gm");
+        APPS.put("जीमेल","com.google.android.gm");
+
+        APPS.put("canva","com.canva.editor");
+        APPS.put("कैनवा","com.canva.editor");
+
+        APPS.put("settings","com.android.settings");
+        APPS.put("सेटिंग","com.android.settings");
+
+        APPS.put("play store","com.android.vending");
+        APPS.put("play store","com.android.vending");
     }
 
     @Override
-    protected void onServiceConnected(){
-
+    public void onServiceConnected() {
         super.onServiceConnected();
 
-        instance = this;
+        instance=this;
 
-        try{
-
-            AccessibilityServiceInfo info =
-                    getServiceInfo();
-
-            if(info != null){
-
-                info.flags |=
-                        AccessibilityServiceInfo
-                                .FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
-
-                setServiceInfo(info);
-            }
-
-        }catch(Exception ignored){}
-
-        showBubble();
-
-        Toast.makeText(
-                this,
-                "MAYA Controller connected",
-                Toast.LENGTH_SHORT
-        ).show();
-
-        String pending =
-                MayaCommandReceiver
-                        .takePendingCommand(this);
-
-        if(pending != null &&
-                !pending.isEmpty()){
-
-            new Handler().postDelayed(
-                    () -> executeCommand(pending),
-                    500
-            );
-        }
+        try {
+            createBubble();
+        } catch(Exception ignored) {}
     }
 
-    @Override
-    public void onAccessibilityEvent(
-            AccessibilityEvent event
-    ){}
+    private void createBubble() {
 
-    @Override
-    public void onInterrupt(){}
+        if(bubble != null)
+            return;
 
-    @Override
-    public boolean onUnbind(Intent intent){
-
-        hideBubble();
-
-        instance = null;
-
-        return super.onUnbind(intent);
-    }
-
-    private void showBubble(){
-
-        if(bubble != null) return;
-
-        try{
-
-            windowManager =
-                    (WindowManager)
-                            getSystemService(
-                                    WINDOW_SERVICE
-                            );
-
-            bubble =
-                    new TextView(this);
-
-            bubble.setText("M");
-            bubble.setTextColor(Color.WHITE);
-            bubble.setTextSize(16);
-            bubble.setGravity(Gravity.CENTER);
-            bubble.setTypeface(
-                    android.graphics.Typeface.DEFAULT_BOLD
-            );
-
-            bubble.setBackgroundColor(
-                    Color.rgb(35, 38, 48)
-            );
-
-            bubble.setPadding(
-                    28,18,28,18
-            );
-
-            bubble.setOnClickListener(
-                    v -> {
-
-                        Intent i =
-                                new Intent(
-                                        this,
-                                        MainActivity.class
-                                );
-
-                        i.addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK |
-                                Intent.FLAG_ACTIVITY_SINGLE_TOP
+        wm =
+                (WindowManager)
+                        getSystemService(
+                                WINDOW_SERVICE
                         );
 
-                        startActivity(i);
-                    }
-            );
+        bubble =
+                new TextView(this);
 
-            WindowManager.LayoutParams lp =
-                    new WindowManager.LayoutParams(
-                            WindowManager.LayoutParams.WRAP_CONTENT,
-                            WindowManager.LayoutParams.WRAP_CONTENT,
-                            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                            PixelFormat.TRANSLUCENT
-                    );
+        bubble.setText("✦\nMAYA");
+        bubble.setTextSize(10);
+        bubble.setTextColor(
+                android.graphics.Color.rgb(
+                        80,60,20
+                )
+        );
+        bubble.setGravity(Gravity.CENTER);
+        bubble.setTypeface(
+                android.graphics.Typeface.DEFAULT,
+                android.graphics.Typeface.BOLD
+        );
 
-            lp.gravity =
-                    Gravity.TOP | Gravity.END;
+        GradientDrawable bg =
+                new GradientDrawable();
 
-            lp.x = 18;
-            lp.y = 110;
+        bg.setColor(
+                android.graphics.Color.WHITE
+        );
+        bg.setCornerRadius(80);
+        bg.setStroke(
+                3,
+                android.graphics.Color.rgb(
+                        210,165,65
+                )
+        );
 
-            windowManager.addView(
-                    bubble,
-                    lp
-            );
+        bubble.setBackground(bg);
 
-        }catch(Exception ignored){}
-    }
-
-    private void hideBubble(){
-
-        try{
-
-            if(windowManager != null &&
-                    bubble != null){
-
-                windowManager.removeView(
-                        bubble
-                );
-            }
-
-        }catch(Exception ignored){}
-
-        bubble = null;
-    }
-
-    public void executeCommand(String raw){
-
-        if(raw == null) return;
-
-        String command = raw.trim();
-
-        if(command.isEmpty()) return;
-
-        String lower =
-                command.toLowerCase(Locale.US);
-
-        if(lower.equals("home") ||
-                lower.contains("go home") ||
-                lower.contains("होम")){
-
-            performGlobalAction(
-                    GLOBAL_ACTION_HOME
-            );
-
-            return;
-        }
-
-        if(lower.equals("back") ||
-                lower.contains("go back") ||
-                lower.contains("वापस")){
-
-            performGlobalAction(
-                    GLOBAL_ACTION_BACK
-            );
-
-            return;
-        }
-
-        if(lower.equals("recent") ||
-                lower.equals("recents") ||
-                lower.contains("recent apps")){
-
-            performGlobalAction(
-                    GLOBAL_ACTION_RECENTS
-            );
-
-            return;
-        }
-
-        if(lower.equals("notifications")){
-
-            performGlobalAction(
-                    GLOBAL_ACTION_NOTIFICATIONS
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("open ")){
-
-            openApp(
-                    command.substring(5).trim()
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("launch ")){
-
-            openApp(
-                    command.substring(7).trim()
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("tap ")){
-
-            clickText(
-                    command.substring(4).trim()
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("click ")){
-
-            clickText(
-                    command.substring(6).trim()
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("type ")){
-
-            typeText(
-                    command.substring(5)
-            );
-
-            return;
-        }
-
-        if(lower.startsWith("scroll down")){
-
-            scroll(false);
-
-            return;
-        }
-
-        if(lower.startsWith("scroll up")){
-
-            scroll(true);
-        }
-    }
-
-    private void openApp(String name){
-
-        String packageName =
-                packageFor(name);
-
-        if(packageName == null){
-
-            Toast.makeText(
-                    this,
-                    "App mapping not found",
-                    Toast.LENGTH_SHORT
-            ).show();
-
-            return;
-        }
-
-        try{
-
-            Intent intent =
-                    getPackageManager()
-                            .getLaunchIntentForPackage(
-                                    packageName
+        bubble.setOnClickListener(
+                v -> {
+                    Intent i =
+                            new Intent(
+                                    this,
+                                    MainActivity.class
                             );
+                    i.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                    );
+                    startActivity(i);
+                }
+        );
 
-            if(intent != null){
+        int type;
 
-                intent.addFlags(
+        if(Build.VERSION.SDK_INT >= 26)
+            type =
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
+        else
+            type =
+                    WindowManager.LayoutParams.TYPE_PHONE;
+
+        WindowManager.LayoutParams p =
+                new WindowManager.LayoutParams(
+                        76,
+                        76,
+                        type,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                );
+
+        p.gravity =
+                Gravity.RIGHT | Gravity.CENTER_VERTICAL;
+
+        p.x=12;
+        p.y=0;
+
+        wm.addView(bubble,p);
+    }
+
+    public static void openApp(
+            Context c,
+            String app
+    ) {
+
+        if(instance != null) {
+            instance.openAppInternal(app);
+            return;
+        }
+
+        String key =
+                app == null
+                ? ""
+                : app.toLowerCase().trim();
+
+        String pkg=APPS.get(key);
+
+        if(pkg==null)
+            return;
+
+        try {
+
+            Intent i =
+                    c.getPackageManager()
+                            .getLaunchIntentForPackage(pkg);
+
+            if(i != null) {
+                i.addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK
                 );
-
-                startActivity(intent);
-
-            }else{
-
-                Toast.makeText(
-                        this,
-                        "App not installed",
-                        Toast.LENGTH_SHORT
-                ).show();
+                c.startActivity(i);
             }
 
-        }catch(Exception e){
-
-            Toast.makeText(
-                    this,
-                    "Unable to open app",
-                    Toast.LENGTH_SHORT
-            ).show();
-        }
+        } catch(Exception ignored) {}
     }
 
-    private String packageFor(String name){
+    private void openAppInternal(String app) {
 
-        String n =
-                name.toLowerCase(Locale.US)
-                        .trim();
+        String key =
+                app == null
+                ? ""
+                : app.toLowerCase().trim();
 
-        if(n.contains("youtube"))
-            return "com.google.android.youtube";
+        String pkg=APPS.get(key);
 
-        if(n.contains("instagram"))
-            return "com.instagram.android";
+        if(pkg==null) {
 
-        if(n.contains("facebook"))
-            return "com.facebook.katana";
+            for(String k:APPS.keySet()) {
+                if(key.contains(k)) {
+                    pkg=APPS.get(k);
+                    break;
+                }
+            }
+        }
 
-        if(n.contains("whatsapp"))
-            return "com.whatsapp";
+        if(pkg==null)
+            return;
 
-        if(n.contains("telegram"))
-            return "org.telegram.messenger";
+        try {
 
-        if(n.contains("chrome"))
-            return "com.android.chrome";
+            Intent i =
+                    getPackageManager()
+                            .getLaunchIntentForPackage(pkg);
 
-        if(n.contains("gmail"))
-            return "com.google.android.gm";
+            if(i != null) {
+                i.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                );
+                startActivity(i);
+            }
 
-        if(n.contains("canva"))
-            return "com.canva.editor";
+        } catch(Exception ignored) {}
+    }
 
-        if(n.contains("settings"))
-            return "com.android.settings";
+    public static boolean tapText(String text) {
 
-        if(n.contains("play store") ||
-                n.contains("playstore"))
-            return "com.android.vending";
+        if(instance == null)
+            return false;
+
+        return instance.tapTextInternal(text);
+    }
+
+    private boolean tapTextInternal(String text) {
+
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
+
+        if(root == null)
+            return false;
+
+        AccessibilityNodeInfo n =
+                findNode(root,text);
+
+        if(n == null)
+            return false;
+
+        boolean result=false;
+
+        try {
+            if(n.isClickable())
+                result=n.performAction(
+                        AccessibilityNodeInfo.ACTION_CLICK
+                );
+            else {
+                AccessibilityNodeInfo p=n.getParent();
+
+                if(p != null && p.isClickable())
+                    result=p.performAction(
+                            AccessibilityNodeInfo.ACTION_CLICK
+                    );
+            }
+        } catch(Exception ignored) {}
+
+        return result;
+    }
+
+    private AccessibilityNodeInfo findNode(
+            AccessibilityNodeInfo root,
+            String text
+    ) {
+
+        if(root == null)
+            return null;
+
+        CharSequence nodeText =
+                root.getText();
+
+        if(nodeText != null &&
+                nodeText.toString()
+                        .equalsIgnoreCase(text))
+            return root;
+
+        CharSequence desc =
+                root.getContentDescription();
+
+        if(desc != null &&
+                desc.toString()
+                        .equalsIgnoreCase(text))
+            return root;
+
+        for(int i=0;i<root.getChildCount();i++) {
+
+            AccessibilityNodeInfo child =
+                    root.getChild(i);
+
+            AccessibilityNodeInfo found =
+                    findNode(child,text);
+
+            if(found != null)
+                return found;
+        }
 
         return null;
     }
 
-    private void clickText(String target){
+    public static boolean typeText(String text) {
 
-        AccessibilityNodeInfo root =
-                getRootInActiveWindow();
+        if(instance == null)
+            return false;
 
-        if(root == null) return;
-
-        List<AccessibilityNodeInfo> nodes =
-                root.findAccessibilityNodeInfosByText(
-                        target
-                );
-
-        if(nodes == null) return;
-
-        for(AccessibilityNodeInfo node : nodes){
-
-            if(node == null) continue;
-
-            if(node.isClickable()){
-
-                if(node.performAction(
-                        AccessibilityNodeInfo.ACTION_CLICK
-                )) return;
-            }
-
-            AccessibilityNodeInfo parent =
-                    node.getParent();
-
-            if(parent != null &&
-                    parent.isClickable()){
-
-                if(parent.performAction(
-                        AccessibilityNodeInfo.ACTION_CLICK
-                )) return;
-            }
-        }
+        return instance.typeTextInternal(text);
     }
 
-    private void typeText(String text){
+    private boolean typeTextInternal(String text) {
 
         AccessibilityNodeInfo root =
                 getRootInActiveWindow();
 
-        if(root == null) return;
+        if(root == null)
+            return false;
 
-        AccessibilityNodeInfo field =
+        AccessibilityNodeInfo focused =
                 root.findFocus(
                         AccessibilityNodeInfo.FOCUS_INPUT
                 );
 
-        if(field == null) return;
+        if(focused == null)
+            return false;
 
-        Bundle bundle =
-                new Bundle();
+        try {
 
-        bundle.putCharSequence(
-                AccessibilityNodeInfo
-                        .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                text
-        );
+            android.os.Bundle b =
+                    new android.os.Bundle();
 
-        field.performAction(
-                AccessibilityNodeInfo.ACTION_SET_TEXT,
-                bundle
-        );
+            b.putCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                    text
+            );
+
+            return focused.performAction(
+                    AccessibilityNodeInfo.ACTION_SET_TEXT,
+                    b
+            );
+
+        } catch(Exception ignored) {
+            return false;
+        }
     }
 
-    private void scroll(boolean up){
+    public static boolean scroll(String direction) {
+
+        if(instance == null)
+            return false;
+
+        return instance.scrollInternal(direction);
+    }
+
+    private boolean scrollInternal(String direction) {
 
         AccessibilityNodeInfo root =
                 getRootInActiveWindow();
 
-        if(root != null){
+        if(root == null)
+            return false;
 
-            performScroll(root, up);
+        boolean down =
+                !"up".equalsIgnoreCase(
+                        direction
+                );
+
+        AccessibilityNodeInfo n =
+                findScrollable(root);
+
+        if(n == null)
+            return false;
+
+        try {
+            return n.performAction(
+                    down
+                    ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                    : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+            );
+        } catch(Exception e) {
+            return false;
         }
     }
 
-    private boolean performScroll(
-            AccessibilityNodeInfo node,
-            boolean up
-    ){
+    private AccessibilityNodeInfo findScrollable(
+            AccessibilityNodeInfo n
+    ) {
 
-        if(node.isScrollable()){
+        if(n == null)
+            return null;
 
-            return node.performAction(
-                    up
-                            ? AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-                            : AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+        if(n.isScrollable())
+            return n;
+
+        for(int i=0;i<n.getChildCount();i++) {
+
+            AccessibilityNodeInfo f =
+                    findScrollable(
+                            n.getChild(i)
+                    );
+
+            if(f != null)
+                return f;
+        }
+
+        return null;
+    }
+
+    public static void globalBack() {
+        if(instance != null)
+            instance.performGlobalAction(
+                    GLOBAL_ACTION_BACK
             );
-        }
+    }
 
-        for(int i=0;i<node.getChildCount();i++){
+    public static void globalHome() {
+        if(instance != null)
+            instance.performGlobalAction(
+                    GLOBAL_ACTION_HOME
+            );
+    }
 
-            AccessibilityNodeInfo child =
-                    node.getChild(i);
+    public static void globalRecent() {
+        if(instance != null)
+            instance.performGlobalAction(
+                    GLOBAL_ACTION_RECENTS
+            );
+    }
 
-            if(child != null &&
-                    performScroll(child,up)){
+    public static void swipe(
+            float x1,
+            float y1,
+            float x2,
+            float y2,
+            long duration
+    ) {
 
-                return true;
-            }
-        }
+        if(instance == null)
+            return;
 
-        return false;
+        if(Build.VERSION.SDK_INT < 24)
+            return;
+
+        Path path = new Path();
+        path.moveTo(x1,y1);
+        path.lineTo(x2,y2);
+
+        GestureDescription.StrokeDescription stroke =
+                new GestureDescription.StrokeDescription(
+                        path,
+                        0,
+                        duration
+                );
+
+        GestureDescription gesture =
+                new GestureDescription.Builder()
+                        .addStroke(stroke)
+                        .build();
+
+        instance.dispatchGesture(
+                gesture,
+                null,
+                null
+        );
+    }
+
+    @Override
+    public void onAccessibilityEvent(
+            android.view.accessibility.AccessibilityEvent event
+    ) {}
+
+    @Override
+    public void onInterrupt() {}
+
+    @Override
+    public void onDestroy() {
+
+        try {
+            if(bubble != null && wm != null)
+                wm.removeView(bubble);
+        } catch(Exception ignored) {}
+
+        bubble=null;
+        instance=null;
+
+        super.onDestroy();
     }
 }

@@ -2,9 +2,7 @@ package com.veer.maya;
 
 import android.content.Context;
 import android.content.Intent;
-
 import android.net.Uri;
-
 import android.os.Handler;
 import android.os.Looper;
 
@@ -15,897 +13,693 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
-import java.nio.charset.StandardCharsets;
+public class MayaCore {
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+    private static final String PREF = "maya_ai";
+    private static final String KEY = "openai_key";
+    private static final String MODEL = "model";
 
-public final class MayaCore {
-
-    private static final String PREFS =
-            "maya_ai";
-
-    private static final String KEY =
-            "openai_key";
-
-    private static final String PENDING =
-            "pending_actions";
-
-    private static final ExecutorService EXECUTOR =
-            Executors.newSingleThreadExecutor();
-
-    private MayaCore(){}
-
-    public static String getKey(Context context){
-
-        return context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
-                .getString(KEY, "");
+    public static String getKey(Context c) {
+        return c.getSharedPreferences(PREF,0)
+                .getString(KEY,"");
     }
 
-    public static void saveKey(
-            Context context,
-            String key
-    ){
-
-        if(key == null) key = "";
-
-        context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
+    public static void saveKey(Context c,String key) {
+        c.getSharedPreferences(PREF,0)
                 .edit()
-                .putString(
-                        KEY,
-                        key.trim()
-                )
+                .putString(KEY,key)
                 .apply();
     }
 
-    public static boolean hasKey(Context context){
-
-        return !getKey(context).trim().isEmpty();
+    public static String getModel(Context c) {
+        return c.getSharedPreferences(PREF,0)
+                .getString(MODEL,"gpt-5.6-luna");
     }
 
-    public static void process(
-            Context context,
-            String user
-    ){
+    public static void saveModel(Context c,String model) {
+        c.getSharedPreferences(PREF,0)
+                .edit()
+                .putString(MODEL,model)
+                .apply();
+    }
 
-        if(user == null ||
-                user.trim().isEmpty()) return;
+    public static void process(Context c,String userText) {
+        if(userText == null || userText.trim().isEmpty())
+            return;
 
-        Context app =
-                context.getApplicationContext();
+        String key = getKey(c);
 
-        MayaMemory.add(
-                app,
-                "user",
-                user
-        );
-
-        if(!hasKey(app)){
-
+        if(key.isEmpty()) {
             reply(
-                    app,
-                    "OpenAI API key अभी सेट नहीं है। Settings → AI Connection में key save करें।"
+                    c,
+                    "Boss, पहले Settings → AI Model & API में अपनी API key set कर दीजिए।"
             );
-
             return;
         }
 
-        EXECUTOR.execute(
-                () -> callAI(app,user.trim())
-        );
+        new Thread(() -> {
+            try {
+                String result = askAI(c,key,userText);
+                handleAIResult(c,result);
+            } catch(Exception e) {
+                reply(
+                        c,
+                        "Boss, AI connection में problem आई: "
+                        + safeError(e)
+                );
+            }
+        }).start();
     }
 
-    public static void testKey(
-            Context context
-    ){
-
-        Context app =
-                context.getApplicationContext();
-
-        String key = getKey(app);
-
-        if(key.trim().isEmpty()){
-
-            reply(
-                    app,
-                    "API key खाली है। पहले key save करें।"
-            );
-
-            return;
-        }
-
-        EXECUTOR.execute(
-                () -> {
-
-                    try{
-
-                        JSONObject body =
-                                new JSONObject();
-
-                        body.put(
-                                "model",
-                                "gpt-5.6-luna"
-                        );
-
-                        body.put(
-                                "input",
-                                "Reply only with: MAYA API OK"
-                        );
-
-                        body.put(
-                                "instructions",
-                                "Return a short confirmation."
-                        );
-
-                        HttpURLConnection connection =
-                                (HttpURLConnection)
-                                        new URL(
-                                                "https://api.openai.com/v1/responses"
-                                        ).openConnection();
-
-                        connection.setRequestMethod(
-                                "POST"
-                        );
-
-                        connection.setConnectTimeout(
-                                20000
-                        );
-
-                        connection.setReadTimeout(
-                                60000
-                        );
-
-                        connection.setRequestProperty(
-                                "Authorization",
-                                "Bearer " + key
-                        );
-
-                        connection.setRequestProperty(
-                                "Content-Type",
-                                "application/json"
-                        );
-
-                        connection.setDoOutput(true);
-
-                        try(OutputStream output =
-                                    connection.getOutputStream()){
-
-                            output.write(
-                                    body.toString()
-                                            .getBytes(
-                                                    StandardCharsets.UTF_8
-                                            )
-                            );
-                        }
-
-                        int code =
-                                connection.getResponseCode();
-
-                        String response =
-                                readResponse(
-                                        connection,
-                                        code
-                                );
-
-                        if(code >= 200 &&
-                                code < 300){
-
-                            reply(
-                                    app,
-                                    "✅ API connection successful. MAYA AI is ready."
-                            );
-
-                        }else{
-
-                            String message =
-                                    extractError(response);
-
-                            reply(
-                                    app,
-                                    "❌ API error " +
-                                            code +
-                                            ": " +
-                                            message
-                            );
-                        }
-
-                        connection.disconnect();
-
-                    }catch(Exception e){
-
-                        reply(
-                                app,
-                                "❌ Connection failed. Internet/API access check करें."
-                        );
-                    }
-                }
-        );
-    }
-
-    private static void callAI(
-            Context context,
+    private static String askAI(
+            Context c,
+            String key,
             String user
-    ){
+    ) throws Exception {
 
-        try{
+        URL url = new URL(
+                "https://api.openai.com/v1/responses"
+        );
 
-            JSONObject body =
-                    new JSONObject();
+        HttpURLConnection con =
+                (HttpURLConnection) url.openConnection();
 
-            body.put(
-                    "model",
-                    "gpt-5.6-luna"
-            );
+        con.setRequestMethod("POST");
+        con.setConnectTimeout(20000);
+        con.setReadTimeout(60000);
+        con.setDoOutput(true);
 
-            body.put(
-                    "instructions",
-                    systemPrompt()
-            );
+        con.setRequestProperty(
+                "Authorization",
+                "Bearer " + key
+        );
 
-            body.put(
-                    "input",
-                    "Memory:\n" +
-                            MayaMemory.get(context) +
-                            "\n\nUser:\n" +
-                            user
-            );
+        con.setRequestProperty(
+                "Content-Type",
+                "application/json"
+        );
 
-            HttpURLConnection connection =
-                    (HttpURLConnection)
-                            new URL(
-                                    "https://api.openai.com/v1/responses"
-                            ).openConnection();
+        String system =
+                "You are MAYA, Boss's personal Android AI phone agent. "
+                + "Your goal is to DO the requested task using available Android controls, "
+                + "not merely explain how to do it. "
+                + "Understand Hindi, English, Hinglish, Maithili and Bhojpuri. "
+                + "Interpret natural language commands and convert them into ordered actions. "
+                + "For multi-step tasks use multiple actions in correct order. "
+                + "Never invent phone numbers, contacts or private data. "
+                + "Calls, messages, purchases, deletion or other high-impact actions require confirmation. "
+                + "Return ONLY valid JSON. "
+                + "Schema: "
+                + "{\"say\":\"short response\","
+                + "\"memory\":\"important fact or empty\","
+                + "\"actions\":["
+                + "{\"type\":\"open_app\",\"value\":\"YouTube\"}"
+                + "]} "
+                + "Allowed action types: "
+                + "open_app, tap, type, scroll, back, home, recent, "
+                + "web_search, open_url, dial, message, keyevent, wait. "
+                + "For tap use the visible text in value. "
+                + "For type use value as text. "
+                + "For scroll value up or down. "
+                + "For wait value milliseconds. "
+                + "For keyevent use Android keyevent number. "
+                + "For web_search value is the query. "
+                + "For open_url value is the complete URL.";
 
-            connection.setRequestMethod(
-                    "POST"
-            );
+        JSONObject body = new JSONObject();
 
-            connection.setConnectTimeout(
-                    20000
-            );
+        body.put(
+                "model",
+                getModel(c)
+        );
 
-            connection.setReadTimeout(
-                    60000
-            );
+        JSONArray input = new JSONArray();
 
-            connection.setRequestProperty(
-                    "Authorization",
-                    "Bearer " + getKey(context)
-            );
+        JSONObject systemMsg = new JSONObject();
+        systemMsg.put("role","system");
+        systemMsg.put("content",system);
 
-            connection.setRequestProperty(
-                    "Content-Type",
-                    "application/json"
-            );
+        JSONObject userMsg = new JSONObject();
+        userMsg.put("role","user");
+        userMsg.put("content",user);
 
-            connection.setDoOutput(true);
+        input.put(systemMsg);
+        input.put(userMsg);
 
-            try(OutputStream output =
-                        connection.getOutputStream()){
+        body.put("input",input);
 
-                output.write(
-                        body.toString()
-                                .getBytes(
-                                        StandardCharsets.UTF_8
-                                )
-                );
-            }
+        OutputStream os = con.getOutputStream();
+        os.write(body.toString().getBytes("UTF-8"));
+        os.close();
 
-            int code =
-                    connection.getResponseCode();
-
-            String response =
-                    readResponse(
-                            connection,
-                            code
-                    );
-
-            if(code >= 400){
-
-                reply(
-                        context,
-                        "OpenAI API error " +
-                                code +
-                                ": " +
-                                extractError(response)
-                );
-
-                return;
-            }
-
-            JSONObject result =
-                    new JSONObject(response);
-
-            String text =
-                    extractText(result);
-
-            JSONObject answer;
-
-            try{
-
-                answer =
-                        new JSONObject(text);
-
-            }catch(Exception e){
-
-                answer =
-                        new JSONObject();
-
-                answer.put(
-                        "say",
-                        text
-                );
-
-                answer.put(
-                        "memory",
-                        new JSONArray()
-                );
-
-                answer.put(
-                        "actions",
-                        new JSONArray()
-                );
-            }
-
-            String say =
-                    answer.optString(
-                            "say",
-                            "ठीक है।"
-                    );
-
-            JSONArray memory =
-                    answer.optJSONArray(
-                            "memory"
-                    );
-
-            if(memory != null){
-
-                for(int i=0;
-                    i<memory.length();
-                    i++){
-
-                    MayaMemory.add(
-                            context,
-                            "memory",
-                            memory.optString(i)
-                    );
-                }
-            }
-
-            JSONArray actions =
-                    answer.optJSONArray(
-                            "actions"
-                    );
-
-            if(actions == null)
-                actions = new JSONArray();
-
-            JSONArray safe =
-                    new JSONArray();
-
-            JSONArray dangerous =
-                    new JSONArray();
-
-            for(int i=0;
-                i<actions.length();
-                i++){
-
-                JSONObject action =
-                        actions.optJSONObject(i);
-
-                if(action == null) continue;
-
-                String type =
-                        action.optString(
-                                "type"
-                        );
-
-                if(
-                        "dial".equals(type) ||
-                        "message".equals(type) ||
-                        "send_message".equals(type) ||
-                        "purchase".equals(type) ||
-                        "delete".equals(type)
-                ){
-
-                    dangerous.put(action);
-
-                }else{
-
-                    safe.put(action);
-                }
-            }
-
-            runActions(
-                    context,
-                    safe
-            );
-
-            if(dangerous.length() > 0){
-
-                savePending(
-                        context,
-                        dangerous
-                );
-
-                reply(
-                        context,
-                        say +
-                                "\n\n⚠️ यह action करने से पहले आपकी confirmation चाहिए."
-                );
-
-            }else{
-
-                reply(
-                        context,
-                        say
-                );
-            }
-
-            connection.disconnect();
-
-        }catch(Exception e){
-
-            reply(
-                    context,
-                    "MAYA connection problem आया। Internet, API key या model access check करें."
-            );
-        }
-    }
-
-    private static String systemPrompt(){
-
-        return
-                "You are MAYA, a practical personal Android AI assistant. " +
-                "Understand Hindi, English, Hinglish, Maithili and Bhojpuri. " +
-                "Answer naturally in the user's language. " +
-                "Return ONLY valid JSON with keys say, memory and actions. " +
-                "Allowed actions: " +
-                "open_app, tap, type, scroll, back, home, recent, web_search, dial, message. " +
-                "Use multiple actions when a task needs multiple steps. " +
-                "Never invent phone numbers or claim an action succeeded unless the controller can execute it. " +
-                "Calls, messages, purchases, deleting data and other high-impact actions require confirmation. " +
-                "Keep say concise.";
-    }
-
-    private static String readResponse(
-            HttpURLConnection connection,
-            int code
-    ) throws Exception{
+        int code = con.getResponseCode();
 
         InputStream stream =
-                code >= 400
-                        ? connection.getErrorStream()
-                        : connection.getInputStream();
+                code >= 200 && code < 300
+                ? con.getInputStream()
+                : con.getErrorStream();
 
-        if(stream == null)
-            return "";
-
-        BufferedReader reader =
+        BufferedReader br =
                 new BufferedReader(
                         new InputStreamReader(
                                 stream,
-                                StandardCharsets.UTF_8
+                                "UTF-8"
                         )
                 );
 
-        StringBuilder result =
-                new StringBuilder();
-
+        StringBuilder out = new StringBuilder();
         String line;
 
-        while((line = reader.readLine()) != null){
+        while((line=br.readLine())!=null)
+            out.append(line);
 
-            result.append(line);
-        }
+        br.close();
+        con.disconnect();
 
-        reader.close();
+        if(code < 200 || code >= 300)
+            throw new Exception(
+                    "HTTP " + code + ": " + out
+            );
 
-        return result.toString();
+        return out.toString();
     }
 
-    private static String extractError(
+    private static void handleAIResult(
+            Context c,
             String raw
-    ){
+    ) {
 
-        try{
-
-            JSONObject object =
+        try {
+            JSONObject response =
                     new JSONObject(raw);
 
-            JSONObject error =
-                    object.optJSONObject(
-                            "error"
+            String outputText =
+                    extractText(response);
+
+            if(outputText == null)
+                throw new Exception("AI output empty");
+
+            outputText =
+                    cleanJson(outputText);
+
+            JSONObject ai =
+                    new JSONObject(outputText);
+
+            String say =
+                    ai.optString(
+                            "say",
+                            "ठीक है boss."
                     );
 
-            if(error != null){
+            String memory =
+                    ai.optString(
+                            "memory",
+                            ""
+                    );
 
-                String message =
-                        error.optString(
-                                "message",
-                                ""
-                        );
-
-                if(!message.isEmpty())
-                    return message;
+            if(!memory.isEmpty()) {
+                saveMemory(c,memory);
             }
 
-        }catch(Exception ignored){}
+            JSONArray actions =
+                    ai.optJSONArray("actions");
 
-        if(raw == null ||
-                raw.trim().isEmpty())
-            return "Unknown API error";
+            List<JSONObject> safe =
+                    new ArrayList<>();
 
-        return raw.length() > 300
-                ? raw.substring(0,300)
-                : raw;
+            List<JSONObject> dangerous =
+                    new ArrayList<>();
+
+            if(actions != null) {
+                for(int i=0;i<actions.length();i++) {
+
+                    JSONObject a =
+                            actions.optJSONObject(i);
+
+                    if(a == null) continue;
+
+                    String type =
+                            a.optString("type","");
+
+                    if(isDangerous(type))
+                        dangerous.add(a);
+                    else
+                        safe.add(a);
+                }
+            }
+
+            reply(c,say);
+
+            for(JSONObject a:safe) {
+                executeAction(c,a);
+
+                try {
+                    Thread.sleep(850);
+                } catch(Exception ignored) {}
+            }
+
+            if(!dangerous.isEmpty()) {
+
+                StringBuilder pending =
+                        new StringBuilder();
+
+                pending.append(
+                        "\n\nBoss, ये action करने से पहले आपकी confirmation चाहिए:\n"
+                );
+
+                for(JSONObject a:dangerous) {
+                    pending.append(
+                            "• "
+                    ).append(
+                            describe(a)
+                    ).append("\n");
+                }
+
+                pending.append(
+                        "\nConfirm बोलें तो आगे करूँगी।"
+                );
+
+                savePending(c,dangerous);
+
+                reply(c,pending.toString());
+            }
+
+        } catch(Exception e) {
+
+            reply(
+                    c,
+                    "Boss, मैंने response समझने की कोशिश की लेकिन "
+                    + "AI output सही format में नहीं आया।"
+            );
+        }
     }
 
     private static String extractText(
             JSONObject response
-    ){
+    ) {
 
-        try{
-
-            JSONArray output =
-                    response.optJSONArray(
-                            "output"
-                    );
-
-            if(output != null){
-
-                for(int i=0;
-                    i<output.length();
-                    i++){
-
-                    JSONObject item =
-                            output.optJSONObject(i);
-
-                    if(item == null) continue;
-
-                    JSONArray content =
-                            item.optJSONArray(
-                                    "content"
-                            );
-
-                    if(content == null)
-                        continue;
-
-                    for(int j=0;
-                        j<content.length();
-                        j++){
-
-                        JSONObject part =
-                                content.optJSONObject(j);
-
-                        if(part == null)
-                            continue;
-
-                        if(
-                                "output_text".equals(
-                                        part.optString("type")
-                                )
-                        ){
-
-                            return part.optString(
-                                    "text",
-                                    ""
-                            );
-                        }
-                    }
-                }
-            }
-
-        }catch(Exception ignored){}
-
-        return
-                "{\"say\":\"Response नहीं मिला\",\"memory\":[],\"actions\":[]}";
-    }
-
-    private static void runActions(
-            Context context,
-            JSONArray actions
-    ){
-
-        Handler handler =
-                new Handler(
-                        Looper.getMainLooper()
+        String direct =
+                response.optString(
+                        "output_text",
+                        ""
                 );
 
-        for(int i=0;
-            i<actions.length();
-            i++){
+        if(!direct.isEmpty())
+            return direct;
 
-            final JSONObject action =
-                    actions.optJSONObject(i);
+        JSONArray output =
+                response.optJSONArray("output");
 
-            final long delay =
-                    i * 900L;
+        if(output == null)
+            return null;
 
-            handler.postDelayed(
-                    () -> {
+        StringBuilder all =
+                new StringBuilder();
 
-                        if(action != null)
-                            executeAction(
-                                    context,
-                                    action
-                            );
+        for(int i=0;i<output.length();i++) {
 
-                    },
-                    delay
-            );
+            JSONObject item =
+                    output.optJSONObject(i);
+
+            if(item == null) continue;
+
+            JSONArray content =
+                    item.optJSONArray("content");
+
+            if(content == null) continue;
+
+            for(int j=0;j<content.length();j++) {
+
+                JSONObject part =
+                        content.optJSONObject(j);
+
+                if(part == null) continue;
+
+                String type =
+                        part.optString("type","");
+
+                if(
+                        "output_text".equals(type) ||
+                        "text".equals(type)
+                ) {
+                    all.append(
+                            part.optString("text","")
+                    );
+                }
+            }
         }
+
+        return all.length()==0
+                ? null
+                : all.toString();
+    }
+
+    private static String cleanJson(String s) {
+
+        s=s.trim();
+
+        if(s.startsWith("```")) {
+            int first =
+                    s.indexOf("\n");
+
+            int last =
+                    s.lastIndexOf("```");
+
+            if(first>=0 && last>first)
+                s=s.substring(
+                        first+1,
+                        last
+                );
+        }
+
+        int a=s.indexOf("{");
+        int b=s.lastIndexOf("}");
+
+        if(a>=0 && b>a)
+            s=s.substring(a,b+1);
+
+        return s.trim();
+    }
+
+    private static boolean isDangerous(String type) {
+
+        return
+                "dial".equals(type) ||
+                "message".equals(type) ||
+                "purchase".equals(type) ||
+                "delete".equals(type);
+    }
+
+    private static String describe(JSONObject a) {
+
+        String type =
+                a.optString("type","action");
+
+        String value =
+                a.optString("value","");
+
+        if("dial".equals(type))
+            return "Call " + value;
+
+        if("message".equals(type))
+            return "Message " + value;
+
+        return type + " " + value;
     }
 
     private static void executeAction(
-            Context context,
-            JSONObject action
-    ){
+            Context c,
+            JSONObject a
+    ) {
 
-        try{
+        try {
 
             String type =
-                    action.optString(
-                            "type"
+                    a.optString("type","");
+
+            String value =
+                    a.optString("value","");
+
+            switch(type) {
+
+                case "open_app":
+                    MayaAccessibilityService.openApp(
+                            c,
+                            value
                     );
+                    break;
 
-            MayaAccessibilityService service =
-                    MayaAccessibilityService
-                            .getInstance();
+                case "tap":
+                    MayaAccessibilityService.tapText(
+                            value
+                    );
+                    break;
 
-            if(
-                    "open_app".equals(type) &&
-                    service != null
-            ){
+                case "type":
+                    MayaAccessibilityService.typeText(
+                            value
+                    );
+                    break;
 
-                service.executeCommand(
-                        "open " +
-                                action.optString(
-                                        "name"
-                                )
-                );
+                case "scroll":
+                    MayaAccessibilityService.scroll(
+                            value
+                    );
+                    break;
 
-            }else if(
-                    "tap".equals(type) &&
-                    service != null
-            ){
+                case "back":
+                    MayaAccessibilityService.globalBack();
+                    break;
 
-                service.executeCommand(
-                        "tap " +
-                                action.optString(
-                                        "text"
-                                )
-                );
+                case "home":
+                    MayaAccessibilityService.globalHome();
+                    break;
 
-            }else if(
-                    "type".equals(type) &&
-                    service != null
-            ){
+                case "recent":
+                    MayaAccessibilityService.globalRecent();
+                    break;
 
-                service.executeCommand(
-                        "type " +
-                                action.optString(
-                                        "text"
-                                )
-                );
+                case "web_search":
+                    openSearch(c,value);
+                    break;
 
-            }else if(
-                    "scroll".equals(type) &&
-                    service != null
-            ){
+                case "open_url":
+                    openUrl(c,value);
+                    break;
 
-                service.executeCommand(
-                        "scroll " +
-                                action.optString(
-                                        "direction"
-                                )
-                );
-
-            }else if(
-                    "back".equals(type) &&
-                    service != null
-            ){
-
-                service.executeCommand(
-                        "back"
-                );
-
-            }else if(
-                    "home".equals(type) &&
-                    service != null
-            ){
-
-                service.executeCommand(
-                        "home"
-                );
-
-            }else if(
-                    "recent".equals(type) &&
-                    service != null
-            ){
-
-                service.executeCommand(
-                        "recent"
-                );
-
-            }else if(
-                    "web_search".equals(type)
-            ){
-
-                Intent intent =
-                        new Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse(
-                                        "https://www.google.com/search?q=" +
-                                                Uri.encode(
-                                                        action.optString(
-                                                                "query"
-                                                        )
-                                                )
-                                )
+                case "keyevent":
+                    try {
+                        Runtime.getRuntime().exec(
+                                new String[]{
+                                        "input",
+                                        "keyevent",
+                                        value
+                                }
                         );
+                    } catch(Exception ignored) {}
+                    break;
 
-                intent.addFlags(
-                        Intent.FLAG_ACTIVITY_NEW_TASK
-                );
+                case "wait":
+                    try {
+                        Thread.sleep(
+                                Long.parseLong(value)
+                        );
+                    } catch(Exception ignored) {}
+                    break;
 
-                context.startActivity(
-                        intent
-                );
+                case "dial":
+                    Intent dial =
+                            new Intent(
+                                    Intent.ACTION_DIAL,
+                                    Uri.parse(
+                                            "tel:" + value
+                                    )
+                            );
+                    dial.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                    );
+                    c.startActivity(dial);
+                    break;
+
+                case "message":
+                    Intent sms =
+                            new Intent(
+                                    Intent.ACTION_SENDTO,
+                                    Uri.parse(
+                                            "smsto:" + value
+                                    )
+                            );
+                    sms.addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK
+                    );
+                    c.startActivity(sms);
+                    break;
             }
 
-        }catch(Exception ignored){}
+        } catch(Exception ignored) {}
+    }
+
+    private static void openSearch(
+            Context c,
+            String q
+    ) {
+
+        try {
+            String url =
+                    "https://www.google.com/search?q="
+                    + Uri.encode(q);
+
+            openUrl(c,url);
+        } catch(Exception ignored) {}
+    }
+
+    private static void openUrl(
+            Context c,
+            String url
+    ) {
+
+        try {
+
+            Intent i =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(url)
+                    );
+
+            i.addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK
+            );
+
+            c.startActivity(i);
+
+        } catch(Exception ignored) {}
+    }
+
+    private static void saveMemory(
+            Context c,
+            String value
+    ) {
+
+        c.getSharedPreferences(
+                "maya_memory",
+                0
+        ).edit()
+                .putString(
+                        "last_memory",
+                        value
+                )
+                .apply();
     }
 
     private static void savePending(
-            Context context,
-            JSONArray actions
-    ){
+            Context c,
+            List<JSONObject> actions
+    ) {
 
-        context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
-                .edit()
+        JSONArray a = new JSONArray();
+
+        for(JSONObject o:actions)
+            a.put(o);
+
+        c.getSharedPreferences(
+                "maya_pending",
+                0
+        ).edit()
                 .putString(
-                        PENDING,
-                        actions.toString()
+                        "actions",
+                        a.toString()
                 )
                 .apply();
     }
 
-    public static boolean hasPending(
-            Context context
-    ){
-
-        return !context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
-                .getString(
-                        PENDING,
-                        ""
-                )
-                .isEmpty();
-    }
-
-    public static void confirmPending(
-            Context context
-    ){
+    public static void confirmPending(Context c) {
 
         String raw =
-                context
-                        .getSharedPreferences(
-                                PREFS,
-                                Context.MODE_PRIVATE
-                        )
-                        .getString(
-                                PENDING,
-                                ""
-                        );
+                c.getSharedPreferences(
+                        "maya_pending",
+                        0
+                ).getString(
+                        "actions",
+                        ""
+                );
 
-        if(raw.isEmpty()){
-
+        if(raw.isEmpty()) {
             reply(
-                    context,
-                    "कोई pending action नहीं है."
+                    c,
+                    "Boss, अभी कोई pending action नहीं है।"
             );
-
             return;
         }
 
-        context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
-                .edit()
-                .remove(PENDING)
-                .apply();
+        try {
 
-        try{
+            JSONArray a =
+                    new JSONArray(raw);
 
-            runActions(
-                    context,
-                    new JSONArray(raw)
-            );
+            for(int i=0;i<a.length();i++) {
 
-            reply(
-                    context,
-                    "Confirmed. Action शुरू कर रही हूँ."
-            );
+                JSONObject o =
+                        a.optJSONObject(i);
 
-        }catch(Exception e){
+                if(o != null)
+                    executeAction(c,o);
+            }
+
+            c.getSharedPreferences(
+                    "maya_pending",
+                    0
+            ).edit().clear().apply();
 
             reply(
-                    context,
-                    "Pending action पढ़ नहीं पाई."
+                    c,
+                    "ठीक है boss, action कर दिया।"
+            );
+
+        } catch(Exception e) {
+
+            reply(
+                    c,
+                    "Boss, pending action execute नहीं हो पाया।"
             );
         }
     }
 
-    public static void cancelPending(
-            Context context
-    ){
+    public static void cancelPending(Context c) {
 
-        context
-                .getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                )
-                .edit()
-                .remove(PENDING)
-                .apply();
+        c.getSharedPreferences(
+                "maya_pending",
+                0
+        ).edit().clear().apply();
 
         reply(
-                context,
-                "ठीक है, action cancel कर दिया."
+                c,
+                "ठीक है boss, action cancel कर दिया।"
         );
     }
 
     private static void reply(
-            Context context,
+            Context c,
             String text
-    ){
+    ) {
 
-        MayaMemory.add(
-                context,
-                "assistant",
-                text
-        );
+        new Handler(
+                Looper.getMainLooper()
+        ).post(() -> {
 
-        Intent intent =
-                new Intent(
-                        "com.veer.maya.REPLY"
-                );
+            try {
+                MayaVoiceService.say(text);
+            } catch(Exception ignored) {}
 
-        intent.setPackage(
-                context.getPackageName()
-        );
+            Intent i =
+                    new Intent(
+                            "com.veer.maya.REPLY"
+                    );
 
-        intent.putExtra(
-                "text",
-                text
-        );
+            i.setPackage(
+                    c.getPackageName()
+            );
 
-        context.sendBroadcast(
-                intent
-        );
+            i.putExtra("text",text);
 
-        MayaVoiceService.say(text);
+            c.sendBroadcast(i);
+        });
+    }
+
+    private static String safeError(Exception e) {
+
+        String s=e.getMessage();
+
+        if(s==null || s.isEmpty())
+            return "unknown error";
+
+        if(s.length()>300)
+            s=s.substring(0,300);
+
+        return s;
     }
 }
