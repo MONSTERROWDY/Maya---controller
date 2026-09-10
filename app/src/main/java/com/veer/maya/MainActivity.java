@@ -81,8 +81,7 @@ public class MainActivity extends Activity {
         clear();
         modeTitle=t("LIVE MODE",24,text,true);modeTitle.setGravity(Gravity.CENTER);content.addView(modeTitle);
         TextView orb=t("◉",110,gold,true);orb.setGravity(Gravity.CENTER);content.addView(orb,new LinearLayout.LayoutParams(-1,220));
-        TextView info=t("Continuous conversation
-Hindi • English • Maithili • Bhojpuri • Hinglish",15,muted,false);info.setGravity(Gravity.CENTER);content.addView(info);
+        TextView info=t("Continuous conversation - Hindi / English / Maithili / Bhojpuri / Hinglish",15,muted,false);info.setGravity(Gravity.CENTER);content.addView(info);
         Button start=big(MayaVoiceService.me==null?"START LIVE VOICE":"STOP LIVE VOICE");content.addView(start);
         start.setOnClickListener(v->{if(MayaVoiceService.me==null)startLive();else{MayaVoiceService.stop(this);showLive();}});
         Button wake=big(MayaVoiceService.isLiveMode(this)?"LIVE MODE ON":"WAKE WORD MODE");content.addView(wake);
