@@ -1,14 +1,13 @@
 package com.veer.maya;
 
 import android.accessibilityservice.AccessibilityService;
-import android.accessibilityservice.GestureDescription;
-import android.graphics.Path;
-import android.graphics.Rect;
 import android.content.Intent;
-import android.content.ComponentName;
+import android.graphics.Rect;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.Toast;
 
 import java.util.List;
 import java.util.Locale;
@@ -23,14 +22,34 @@ public class MayaAccessibilityService extends AccessibilityService {
 
     @Override
     protected void onServiceConnected() {
+
         super.onServiceConnected();
+
         instance = this;
+
+        Toast.makeText(
+                this,
+                "MAYA Controller CONNECTED",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        String pending =
+                MayaCommandReceiver.takePendingCommand(this);
+
+        if (pending != null && !pending.isEmpty()) {
+
+            final String command = pending;
+
+            new Handler().postDelayed(
+                    () -> executeCommand(command),
+                    500
+            );
+        }
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        // Screen monitoring is available here.
-        // MAYA commands are executed through executeCommand().
+        // MAYA screen control is handled here.
     }
 
     @Override
@@ -39,7 +58,9 @@ public class MayaAccessibilityService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(Intent intent) {
+
         instance = null;
+
         return super.onUnbind(intent);
     }
 
@@ -50,92 +71,156 @@ public class MayaAccessibilityService extends AccessibilityService {
         }
 
         String command = rawCommand.trim();
-        String lower = command.toLowerCase(Locale.US);
 
-        if (lower.equals("home") ||
-            lower.contains("go home") ||
-            lower.contains("होम")) {
-
-            performGlobalAction(GLOBAL_ACTION_HOME);
+        if (command.isEmpty()) {
             return;
         }
 
-        if (lower.equals("back") ||
-            lower.contains("go back") ||
-            lower.contains("वापस")) {
+        String lower =
+                command.toLowerCase(Locale.US);
 
-            performGlobalAction(GLOBAL_ACTION_BACK);
+        if (
+                lower.equals("home") ||
+                lower.contains("go home") ||
+                lower.contains("होम")
+        ) {
+
+            performGlobalAction(
+                    GLOBAL_ACTION_HOME
+            );
+
             return;
         }
 
-        if (lower.contains("recent")) {
-            performGlobalAction(GLOBAL_ACTION_RECENTS);
+        if (
+                lower.equals("back") ||
+                lower.contains("go back") ||
+                lower.contains("वापस")
+        ) {
+
+            performGlobalAction(
+                    GLOBAL_ACTION_BACK
+            );
+
+            return;
+        }
+
+        if (
+                lower.equals("recent") ||
+                lower.equals("recents") ||
+                lower.contains("recent apps")
+        ) {
+
+            performGlobalAction(
+                    GLOBAL_ACTION_RECENTS
+            );
+
             return;
         }
 
         if (lower.startsWith("open ")) {
-            String appName = command.substring(5).trim();
+
+            String appName =
+                    command.substring(5).trim();
+
             openApp(appName);
+
             return;
         }
 
         if (lower.startsWith("launch ")) {
-            String appName = command.substring(7).trim();
+
+            String appName =
+                    command.substring(7).trim();
+
             openApp(appName);
+
             return;
         }
 
         if (lower.startsWith("tap ")) {
-            String text = command.substring(4).trim();
+
+            String text =
+                    command.substring(4).trim();
+
             clickText(text);
+
             return;
         }
 
         if (lower.startsWith("click ")) {
-            String text = command.substring(6).trim();
+
+            String text =
+                    command.substring(6).trim();
+
             clickText(text);
+
             return;
         }
 
         if (lower.startsWith("type ")) {
-            String text = command.substring(5);
+
+            String text =
+                    command.substring(5);
+
             typeText(text);
+
             return;
         }
 
         if (lower.startsWith("scroll down")) {
+
             scroll(false);
+
             return;
         }
 
         if (lower.startsWith("scroll up")) {
+
             scroll(true);
         }
     }
 
     private void openApp(String appName) {
 
-        String packageName = getPackageNameForApp(appName);
+        String packageName =
+                getPackageNameForApp(appName);
 
         if (packageName == null) {
             return;
         }
 
         try {
+
             Intent launchIntent =
-                    getPackageManager().getLaunchIntentForPackage(packageName);
+                    getPackageManager()
+                            .getLaunchIntentForPackage(
+                                    packageName
+                            );
 
             if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+                launchIntent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                );
+
                 startActivity(launchIntent);
             }
-        } catch (Exception ignored) {
+
+        } catch (Exception e) {
+
+            Toast.makeText(
+                    this,
+                    "Unable to open " + appName,
+                    Toast.LENGTH_SHORT
+            ).show();
         }
     }
 
     private String getPackageNameForApp(String name) {
 
-        String n = name.toLowerCase(Locale.US).trim();
+        String n =
+                name.toLowerCase(Locale.US).trim();
 
         if (n.contains("youtube")) {
             return "com.google.android.youtube";
@@ -169,7 +254,10 @@ public class MayaAccessibilityService extends AccessibilityService {
             return "com.android.settings";
         }
 
-        if (n.contains("play store") || n.contains("playstore")) {
+        if (
+                n.contains("play store") ||
+                n.contains("playstore")
+        ) {
             return "com.android.vending";
         }
 
@@ -178,14 +266,17 @@ public class MayaAccessibilityService extends AccessibilityService {
 
     private void clickText(String target) {
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
 
         if (root == null) {
             return;
         }
 
         List<AccessibilityNodeInfo> nodes =
-                root.findAccessibilityNodeInfosByText(target);
+                root.findAccessibilityNodeInfosByText(
+                        target
+                );
 
         if (nodes == null || nodes.isEmpty()) {
             return;
@@ -198,18 +289,26 @@ public class MayaAccessibilityService extends AccessibilityService {
             }
 
             if (node.isClickable()) {
+
                 node.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
+
                 return;
             }
 
-            AccessibilityNodeInfo parent = node.getParent();
+            AccessibilityNodeInfo parent =
+                    node.getParent();
 
-            if (parent != null && parent.isClickable()) {
+            if (
+                    parent != null &&
+                    parent.isClickable()
+            ) {
+
                 parent.performAction(
                         AccessibilityNodeInfo.ACTION_CLICK
                 );
+
                 return;
             }
         }
@@ -217,7 +316,8 @@ public class MayaAccessibilityService extends AccessibilityService {
 
     private void typeText(String text) {
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
 
         if (root == null) {
             return;
@@ -225,7 +325,7 @@ public class MayaAccessibilityService extends AccessibilityService {
 
         AccessibilityNodeInfo focused =
                 root.findFocus(
-                    AccessibilityNodeInfo.FOCUS_INPUT
+                        AccessibilityNodeInfo.FOCUS_INPUT
                 );
 
         if (focused == null) {
@@ -235,7 +335,8 @@ public class MayaAccessibilityService extends AccessibilityService {
         Bundle args = new Bundle();
 
         args.putCharSequence(
-                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                AccessibilityNodeInfo
+                        .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
                 text
         );
 
@@ -247,45 +348,45 @@ public class MayaAccessibilityService extends AccessibilityService {
 
     private void scroll(boolean up) {
 
-        AccessibilityNodeInfo root = getRootInActiveWindow();
+        AccessibilityNodeInfo root =
+                getRootInActiveWindow();
 
         if (root == null) {
             return;
         }
 
-        if (performScroll(root, up)) {
-            return;
-        }
+        performScroll(root, up);
     }
 
     private boolean performScroll(
             AccessibilityNodeInfo node,
-            boolean up) {
+            boolean up
+    ) {
 
         if (node.isScrollable()) {
 
-            int action;
-
-            if (up) {
-                action =
-                    AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD;
-            } else {
-                action =
-                    AccessibilityNodeInfo.ACTION_SCROLL_FORWARD;
-            }
+            int action =
+                    up
+                    ? AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                    : AccessibilityNodeInfo.ACTION_SCROLL_FORWARD;
 
             return node.performAction(action);
         }
 
-        for (int i = 0; i < node.getChildCount(); i++) {
+        for (
+                int i = 0;
+                i < node.getChildCount();
+                i++
+        ) {
 
-            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo child =
+                    node.getChild(i);
 
-            if (child != null) {
-
-                if (performScroll(child, up)) {
-                    return true;
-                }
+            if (
+                    child != null &&
+                    performScroll(child, up)
+            ) {
+                return true;
             }
         }
 
