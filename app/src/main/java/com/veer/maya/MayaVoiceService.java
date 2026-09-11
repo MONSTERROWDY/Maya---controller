@@ -4,14 +4,9 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.content.pm.ServiceInfo;
 import android.os.Build;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
@@ -22,468 +17,258 @@ import java.util.Locale;
 
 public class MayaVoiceService extends Service {
 
-    public static MayaVoiceService me;
-
-    private SpeechRecognizer sr;
-    private TextToSpeech tts;
-
-    private final Handler h =
-            new Handler(Looper.getMainLooper());
-
-    private boolean listening;
-    private boolean liveMode;
-
-    public static void start(Context c) {
-
-        Intent i =
-                new Intent(
-                        c,
-                        MayaVoiceService.class
-                );
-
-        if(Build.VERSION.SDK_INT >= 26)
-            c.startForegroundService(i);
-        else
-            c.startService(i);
-    }
-
-    public static void stop(Context c) {
-        c.stopService(
-                new Intent(
-                        c,
-                        MayaVoiceService.class
-                )
-        );
-    }
-
-    public static void setLiveMode(
-            Context c,
-            boolean on
-    ) {
-
-        c.getSharedPreferences(
-                "maya_voice",
-                0
-        ).edit()
-                .putBoolean("live",on)
-                .apply();
-
-        if(me != null)
-            me.liveMode=on;
-    }
-
-    public static boolean isLiveMode(Context c) {
-
-        return c.getSharedPreferences(
-                "maya_voice",
-                0
-        ).getBoolean(
-                "live",
-                false
-        );
-    }
-
-    public static void say(String s) {
-
-        if(me != null &&
-                me.tts != null &&
-                s != null &&
-                !s.isEmpty()) {
-
-            try {
-                me.tts.speak(
-                        s,
-                        TextToSpeech.QUEUE_FLUSH,
-                        null,
-                        "maya"
-                );
-            } catch(Exception ignored) {}
-        }
-    }
+    SpeechRecognizer recognizer;
+    TextToSpeech tts;
 
     @Override
     public void onCreate() {
-
         super.onCreate();
 
-        me=this;
-        liveMode=isLiveMode(this);
+        createNotification();
 
-        if(Build.VERSION.SDK_INT >= 26) {
-
-            NotificationChannel ch =
-                    new NotificationChannel(
-                            "maya_voice",
-                            "MAYA Voice",
-                            NotificationManager.IMPORTANCE_LOW
+        tts = new TextToSpeech(
+            this,
+            status -> {
+                if (status == TextToSpeech.SUCCESS) {
+                    tts.setLanguage(
+                        new Locale("hi","IN")
                     );
-
-            NotificationManager nm =
-                    getSystemService(
-                            NotificationManager.class
-                    );
-
-            if(nm != null)
-                nm.createNotificationChannel(ch);
-        }
-
-        Notification n;
-
-        if(Build.VERSION.SDK_INT >= 26) {
-
-            n =
-                    new Notification.Builder(
-                            this,
-                            "maya_voice"
-                    )
-                    .setContentTitle(
-                            "MAYA is active"
-                    )
-                    .setContentText(
-                            "MAYA voice assistant"
-                    )
-                    .setSmallIcon(
-                            android.R.drawable.ic_btn_speak_now
-                    )
-                    .setOngoing(true)
-                    .build();
-
-        } else {
-
-            n =
-                    new Notification.Builder(this)
-                    .setContentTitle(
-                            "MAYA is active"
-                    )
-                    .setContentText(
-                            "MAYA voice assistant"
-                    )
-                    .setSmallIcon(
-                            android.R.drawable.ic_btn_speak_now
-                    )
-                    .setOngoing(true)
-                    .build();
-        }
-
-        try {
-
-            if(Build.VERSION.SDK_INT >= 29) {
-
-                startForeground(
-                        7,
-                        n,
-                        ServiceInfo
-                                .FOREGROUND_SERVICE_TYPE_MICROPHONE
-                );
-
-            } else {
-
-                startForeground(
-                        7,
-                        n
-                );
+                }
             }
+        );
 
-        } catch(Exception e) {
-
-            startForeground(
-                    7,
-                    n
-            );
-        }
-
-        tts =
-                new TextToSpeech(
-                        this,
-                        status -> {
-
-                            try {
-                                if(status ==
-                                        TextToSpeech.SUCCESS) {
-
-                                    int r =
-                                            tts.setLanguage(
-                                                    new Locale(
-                                                            "hi",
-                                                            "IN"
-                                                    )
-                                            );
-
-                                    if(r ==
-                                            TextToSpeech.LANG_MISSING_DATA ||
-                                            r ==
-                                            TextToSpeech.LANG_NOT_SUPPORTED) {
-
-                                        tts.setLanguage(
-                                                Locale.getDefault()
-                                        );
-                                    }
-                                }
-                            } catch(Exception ignored) {}
-                        }
-                );
-
-        if(checkSelfPermission(
-                "android.permission.RECORD_AUDIO"
-        ) == PackageManager.PERMISSION_GRANTED) {
-
-            listen();
-        }
+        startListening();
     }
 
-    private void listen() {
+    void createNotification() {
 
-        if(listening)
+        String channel = "maya_voice";
+
+        if (Build.VERSION.SDK_INT >= 26) {
+
+            NotificationChannel nc =
+                new NotificationChannel(
+                    channel,
+                    "MAYA Voice",
+                    NotificationManager.IMPORTANCE_LOW
+                );
+
+            getSystemService(
+                NotificationManager.class
+            ).createNotificationChannel(nc);
+        }
+
+        Notification.Builder b =
+            Build.VERSION.SDK_INT >= 26
+            ? new Notification.Builder(this, channel)
+            : new Notification.Builder(this);
+
+        b.setContentTitle("MAYA")
+         .setContentText(
+             "Hello Boss voice assistant active"
+         )
+         .setSmallIcon(
+             android.R.drawable.ic_btn_speak_now
+         );
+
+        startForeground(
+            77,
+            b.build()
+        );
+    }
+
+    void startListening() {
+
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            speak("Speech recognition available नहीं है");
             return;
+        }
 
-        if(checkSelfPermission(
-                "android.permission.RECORD_AUDIO"
-        ) != PackageManager.PERMISSION_GRANTED)
-            return;
+        recognizer =
+            SpeechRecognizer.createSpeechRecognizer(this);
 
-        listening=true;
+        recognizer.setRecognitionListener(
+            new RecognitionListener() {
 
-        try {
+                @Override
+                public void onResults(
+                    Bundle results
+                ) {
 
-            if(sr != null)
-                sr.destroy();
-
-        } catch(Exception ignored) {}
-
-        sr =
-                SpeechRecognizer
-                        .createSpeechRecognizer(this);
-
-        sr.setRecognitionListener(
-                new RecognitionListener() {
-
-                    @Override
-                    public void onResults(
-                            android.os.Bundle b
-                    ) {
-
-                        listening=false;
-
-                        ArrayList<String> a =
-                                b.getStringArrayList(
-                                        SpeechRecognizer
-                                                .RESULTS_RECOGNITION
-                                );
-
-                        if(a != null &&
-                                !a.isEmpty()) {
-
-                            handle(
-                                    a.get(0)
-                            );
-                        }
-
-                        h.postDelayed(
-                                () -> listen(),
-                                liveMode ? 300 : 900
+                    ArrayList<String> list =
+                        results.getStringArrayList(
+                            SpeechRecognizer.RESULTS_RECOGNITION
                         );
+
+                    if (list == null ||
+                        list.isEmpty()) {
+
+                        restart();
+                        return;
                     }
 
-                    @Override
-                    public void onError(int e) {
-
-                        listening=false;
-
-                        h.postDelayed(
-                                () -> listen(),
-                                liveMode ? 400 : 1100
-                        );
-                    }
-
-                    public void onReadyForSpeech(
-                            android.os.Bundle b
-                    ) {}
-
-                    public void onBeginningOfSpeech() {}
-
-                    public void onRmsChanged(float r) {}
-
-                    public void onBufferReceived(
-                            byte[] b
-                    ) {}
-
-                    public void onEndOfSpeech() {}
-
-                    public void onPartialResults(
-                            android.os.Bundle b
-                    ) {}
-
-                    public void onEvent(
-                            int a,
-                            android.os.Bundle b
-                    ) {}
+                    handle(list.get(0));
                 }
+
+                @Override public void onError(int e) {
+                    restart();
+                }
+
+                @Override public void onReadyForSpeech(Bundle b){}
+                @Override public void onBeginningOfSpeech(){}
+                @Override public void onRmsChanged(float r){}
+                @Override public void onBufferReceived(byte[] b){}
+                @Override public void onEndOfSpeech(){}
+                @Override public void onPartialResults(Bundle b){}
+                @Override public void onEvent(int a, Bundle b){}
+            }
         );
 
         Intent i =
-                new Intent(
-                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-                );
+            new Intent(
+                RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+            );
 
         i.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+            RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
         );
 
         i.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                "hi-IN"
+            RecognizerIntent.EXTRA_LANGUAGE,
+            "hi-IN"
         );
 
         i.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,
-                "hi-IN"
-        );
-
-        i.putExtra(
-                RecognizerIntent.EXTRA_MAX_RESULTS,
-                3
+            RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+            false
         );
 
         try {
-            sr.startListening(i);
-        } catch(Exception e) {
-
-            listening=false;
-
-            h.postDelayed(
-                    () -> listen(),
-                    1200
-            );
+            recognizer.startListening(i);
+        } catch (Exception ignored) {
+            restart();
         }
     }
 
-    private void handle(String heard) {
+    void handle(String heard) {
 
-        if(heard == null)
+        if (heard == null) {
+            restart();
             return;
+        }
 
-        String x=heard.trim();
-
-        if(x.isEmpty())
-            return;
+        String text =
+            heard.trim();
 
         String lower =
-                x.toLowerCase(Locale.US);
+            text.toLowerCase(Locale.ROOT);
 
         boolean wake =
-                lower.contains("maya") ||
-                x.contains("माया") ||
-                x.contains("माइया") ||
-                x.contains("मैया");
+            lower.contains("hello boss") ||
+            lower.contains("hello boss.") ||
+            text.contains("हेलो बॉस") ||
+            lower.contains("maya") ||
+            text.contains("माया");
 
-        if(!liveMode && !wake)
-            return;
-
-        if(wake) {
-
-            x=x.replaceAll(
-                    "(?i)\\bmaya\\b",
-                    " "
-            );
-
-            x=x.replace(
-                    "माया",
-                    " "
-            );
-
-            x=x.replace(
-                    "माइया",
-                    " "
-            );
-
-            x=x.replace(
-                    "मैया",
-                    " "
-            );
-
-            x=x.trim();
-        }
-
-        if(x.isEmpty()) {
-
-            say(
-                    "हाँ boss, बोलिए।"
-            );
-
+        if (!wake) {
+            restart();
             return;
         }
 
-        String low =
-                x.toLowerCase(Locale.US);
+        text =
+            text.replaceAll(
+                "(?i)hello\\s+boss",
+                ""
+            );
 
-        if(
-                low.equals("confirm") ||
-                low.equals("yes") ||
-                low.equals("हाँ") ||
-                low.equals("हा") ||
-                low.contains("कर दो") ||
-                low.contains("कर दीजिए")
-        ) {
+        text =
+            text.replaceAll(
+                "(?i)maya",
+                ""
+            );
 
-            MayaCore.confirmPending(this);
+        text =
+            text.replace(
+                "हेलो बॉस",
+                ""
+            );
+
+        text =
+            text.replace(
+                "माया",
+                ""
+            ).trim();
+
+        if (text.isEmpty()) {
+
+            speak("Hello Boss. हाँ, बोलिए।");
+
+            restart();
             return;
         }
 
-        if(
-                low.equals("cancel") ||
-                low.equals("no") ||
-                low.equals("नहीं") ||
-                low.contains("मत करो")
-        ) {
+        MayaCore.ask(
+            this,
+            text,
+            (ok, answer) -> {
 
-            MayaCore.cancelPending(this);
-            return;
-        }
+                speak(answer);
 
-        MayaCore.process(
-                this,
-                x
+                restart();
+            }
         );
+    }
+
+    void speak(String text) {
+
+        if (tts == null) return;
+
+        try {
+            tts.speak(
+                text,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "maya_reply"
+            );
+        } catch (Exception ignored) {}
+    }
+
+    void restart() {
+
+        new android.os.Handler()
+            .postDelayed(
+                this::startListening,
+                700
+            );
     }
 
     @Override
     public int onStartCommand(
-            Intent i,
-            int flags,
-            int id
+        Intent intent,
+        int flags,
+        int startId
     ) {
-
-        liveMode=isLiveMode(this);
-
-        if(!listening)
-            listen();
-
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
 
-        listening=false;
+        if (recognizer != null) {
+            recognizer.destroy();
+        }
 
-        try {
-            if(sr != null)
-                sr.destroy();
-        } catch(Exception ignored) {}
-
-        try {
-            if(tts != null)
-                tts.shutdown();
-        } catch(Exception ignored) {}
-
-        me=null;
+        if (tts != null) {
+            tts.stop();
+            tts.shutdown();
+        }
 
         super.onDestroy();
     }
 
     @Override
-    public IBinder onBind(Intent i) {
+    public IBinder onBind(Intent intent) {
         return null;
     }
 }

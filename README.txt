@@ -1,12 +1,25 @@
-MAYA Controller
+MAYA — Voice + AI Brain + Android Agent
 
-Android Accessibility controller for MAYA.
+Primary wake phrase:
+Hello Boss
 
-Build:
-gradle assembleDebug
+Compatible wake phrases:
+Maya
+माया
+हेलो बॉस
 
-APK:
-app/build/outputs/apk/debug/app-debug.apk
+Features:
+- AI chat
+- Voice assistant
+- Hello Boss wake phrase
+- Android Accessibility Agent
+- Local API key storage
+- API connection test
+- API error handling
+- Premium portrait HUD
+- GitHub Actions automatic APK build
+- Automatic versioned releases
 
-Broadcast command example:
-am broadcast -a com.veer.maya.ACTION --es command "open YouTube"
+IMPORTANT:
+Never put an API key inside source code.
+API keys are stored locally on the Android device.
