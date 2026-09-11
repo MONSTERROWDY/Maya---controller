@@ -1,5 +1,6 @@
+import android.app.Activity;
+import android.app.AlertDialog;
 package com.veer.maya;
-
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
