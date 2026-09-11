@@ -20,34 +20,34 @@ public class MayaBootReceiver extends BroadcastReceiver {
         String action =
                 intent.getAction();
 
-        if (!Intent.ACTION_BOOT_COMPLETED.equals(action) &&
-                !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(action)
+                && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+
             return;
         }
 
         boolean enabled =
-                context.getSharedPreferences(
-                        "maya_settings",
-                        Context.MODE_PRIVATE
-                ).getBoolean(
-                        "maya_enabled",
-                        false
-                );
+                context
+                        .getSharedPreferences(
+                                "maya_settings",
+                                Context.MODE_PRIVATE
+                        )
+                        .getBoolean(
+                                "maya_enabled",
+                                false
+                        );
 
         if (!enabled) {
             return;
         }
 
         /*
-         * Android versions with strict background
-         * microphone restrictions may refuse a microphone
-         * foreground service directly from boot.
+         * Android 8+ background execution restrictions
+         * prevent a normal background start in many cases.
          *
-         * We remember the ON state here.
-         * The app can start the voice service when Android
-         * allows the user-initiated foreground transition.
+         * We intentionally do not force microphone startup
+         * from boot on modern Android versions.
          */
-
         if (Build.VERSION.SDK_INT < 26) {
 
             Intent service =
@@ -56,9 +56,7 @@ public class MayaBootReceiver extends BroadcastReceiver {
                             MayaVoiceService.class
                     );
 
-            context.startService(
-                    service
-            );
+            context.startService(service);
         }
     }
 }
