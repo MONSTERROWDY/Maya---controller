@@ -90,19 +90,64 @@ public class MainActivity extends Activity {
         page.setOrientation(LinearLayout.VERTICAL);
         page.setPadding(14,14,14,24);
 
+        LinearLayout brand =
+            new LinearLayout(this);
+
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        brand.setPadding(4, 4, 4, 8);
+
+        ImageView logo =
+            new ImageView(this);
+
+        logo.setImageResource(
+            com.veer.maya.R.drawable.maya_logo
+        );
+
+        brand.addView(
+            logo,
+            new LinearLayout.LayoutParams(
+                dp(58),
+                dp(58)
+            )
+        );
+
+        LinearLayout brandText =
+            new LinearLayout(this);
+
+        brandText.setOrientation(
+            LinearLayout.VERTICAL
+        );
+
         TextView title =
             tv("MAYA", 30, white);
 
         title.setTypeface(
-            Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            Typeface.create(
+                Typeface.DEFAULT,
+                Typeface.BOLD
+            )
         );
 
-        page.addView(title);
+        brandText.addView(title);
 
         TextView sub =
-            tv("VOICE • BRAIN • AGENT • MEMORY", 11, cyan);
+            tv(
+                "VOICE • BRAIN • AGENT • MEMORY",
+                11,
+                cyan
+            );
 
-        page.addView(sub);
+        brandText.addView(sub);
+
+        brand.addView(
+            brandText,
+            new LinearLayout.LayoutParams(
+                -1,
+                -2
+            )
+        );
+
+        page.addView(brand);
 
         hud = new HudView();
         page.addView(
@@ -145,9 +190,14 @@ public class MainActivity extends Activity {
         page.addView(send);
 
         Button voice =
-            button("START HELLO BOSS VOICE");
+            button("START HELLO BOSS / MAYA LIVE VOICE");
 
         page.addView(voice);
+
+        Button popupPermission =
+            button("ENABLE MAYA LIVE POPUP");
+
+        page.addView(popupPermission);
 
         Button accessibility =
             button("ANDROID AGENT / ACCESSIBILITY");
@@ -252,6 +302,38 @@ public class MainActivity extends Activity {
                 startForegroundService(i);
             } else {
                 startService(i);
+            }
+
+            Toast.makeText(
+                this,
+                "MAYA Live Voice Started",
+                Toast.LENGTH_SHORT
+            ).show();
+        });
+
+        popupPermission.setOnClickListener(v -> {
+
+            try {
+
+                Intent overlay =
+                    new Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse(
+                            "package:" + getPackageName()
+                        )
+                    );
+
+                startActivity(overlay);
+
+            } catch (Exception e) {
+
+                try {
+                    startActivity(
+                        new Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION
+                        )
+                    );
+                } catch (Exception ignored) {}
             }
         });
 
