@@ -16,6 +16,41 @@ public class MayaAccessibilityService
         instance = this;
     }
 
+    public static MayaAccessibilityService getInstance() {
+        return instance;
+    }
+
+    public void executeCommand(String command) {
+        if (command == null) return;
+
+        String c = command.trim();
+        String l = c.toLowerCase(java.util.Locale.ROOT);
+
+        if (l.equals("home") || l.contains("go home") || c.contains("होम")) {
+            home();
+            return;
+        }
+
+        if (l.equals("back") || l.contains("go back") || c.contains("बैक")) {
+            back();
+            return;
+        }
+
+        if (l.equals("recent") || l.contains("recent apps") || c.contains("रीसेंट")) {
+            recent();
+            return;
+        }
+
+        if (l.contains("notification") || c.contains("नोटिफिकेशन")) {
+            openNotifications();
+            return;
+        }
+
+        if (l.startsWith("type ")) {
+            typeText(c.substring(5).trim());
+        }
+    }
+
     public static boolean isReady() {
         return instance != null;
     }

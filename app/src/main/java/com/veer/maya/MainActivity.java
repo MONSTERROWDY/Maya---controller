@@ -166,7 +166,7 @@ public class MainActivity extends Activity {
         api.setSingleLine(true);
         api.setInputType(129);
         api.setText(
-            MayaCore.getApi()
+            MayaCore.getApi(this)
         );
 
         page.addView(api);
@@ -177,7 +177,7 @@ public class MainActivity extends Activity {
         endpoint.setTextColor(white);
         endpoint.setSingleLine(true);
         endpoint.setText(
-            MayaCore.getEndpoint()
+            MayaCore.getEndpoint(this)
         );
 
         page.addView(endpoint);
@@ -188,7 +188,7 @@ public class MainActivity extends Activity {
         model.setTextColor(white);
         model.setSingleLine(true);
         model.setText(
-            MayaCore.getModel()
+            MayaCore.getModel(this)
         );
 
         page.addView(model);

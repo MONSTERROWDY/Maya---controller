@@ -85,7 +85,7 @@ public final class MayaCore {
             HttpURLConnection conn = null;
 
             try {
-                URL url = new URL(getEndpoint());
+                URL url = new URL(getEndpoint(context));
 
                 conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -224,6 +224,20 @@ public final class MayaCore {
             }
 
         }).start();
+    }
+
+    public static void confirmPending(Context context) {
+        String command = MayaCommandReceiver.takePendingCommand(context);
+        if (command != null && MayaAccessibilityService.isReady()) {
+            MayaAccessibilityService.getInstance().executeCommand(command);
+        }
+    }
+
+    public static void cancelPending(Context context) {
+        context.getSharedPreferences(
+            "maya_controller",
+            Context.MODE_PRIVATE
+        ).edit().remove("pending_command").apply();
     }
 
     private static String extractText(String raw) {
