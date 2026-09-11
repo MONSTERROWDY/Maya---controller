@@ -7,11 +7,10 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
+import android.graphics.PixelFormat;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
+import android.os.IBinder;
 import android.provider.Settings;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -29,652 +28,575 @@ import java.util.Locale;
 
 public class MayaVoiceService extends Service {
 
-    SpeechRecognizer recognizer;
-    TextToSpeech tts;
+    private SpeechRecognizer recognizer;
+    private TextToSpeech tts;
 
-    WindowManager windowManager;
-    LinearLayout popup;
-    TextView popupStatus;
-    TextView popupConversation;
+    private WindowManager wm;
+    private LinearLayout popup;
+    private TextView popupStatus;
+    private TextView popupChat;
 
-    boolean liveConversation = false;
-    boolean popupShowing = false;
-    boolean processing = false;
+    private boolean listening = false;
+    private boolean liveConversation = false;
+    private boolean processing = false;
+    private boolean popupShowing = false;
 
-    Handler handler = new Handler();
-
-    int cyan = Color.rgb(93,220,255);
-    int white = Color.WHITE;
-    int muted = Color.rgb(155,170,185);
-    int dark = Color.rgb(5,9,15);
+    private final int cyan = Color.rgb(0, 229, 255);
 
     @Override
     public void onCreate() {
         super.onCreate();
 
-        createNotification();
+        createChannel();
+        startForeground(
+                77,
+                buildNotification()
+        );
 
-        tts = new TextToSpeech(this, status -> {
-            if (status == TextToSpeech.SUCCESS) {
-                tts.setLanguage(new Locale("hi", "IN"));
-            }
-        });
+        tts = new TextToSpeech(
+                this,
+                status -> {
+                    if (status == TextToSpeech.SUCCESS) {
+                        tts.setLanguage(
+                                new Locale("hi", "IN")
+                        );
+                    }
+                }
+        );
 
-        windowManager =
-            (WindowManager)getSystemService(WINDOW_SERVICE);
+        if (SpeechRecognizer.isRecognitionAvailable(this)) {
+            recognizer =
+                    SpeechRecognizer.createSpeechRecognizer(this);
 
-        startListening();
+            recognizer.setRecognitionListener(
+                    new RecognitionListener() {
+
+                        @Override
+                        public void onReadyForSpeech(Bundle params) {
+                            setStatus("● LISTENING");
+                        }
+
+                        @Override
+                        public void onBeginningOfSpeech() {
+                            setStatus("● LISTENING");
+                        }
+
+                        @Override
+                        public void onRmsChanged(float rmsdB) {
+                        }
+
+                        @Override
+                        public void onBufferReceived(byte[] buffer) {
+                        }
+
+                        @Override
+                        public void onEndOfSpeech() {
+                            setStatus("● UNDERSTANDING");
+                        }
+
+                        @Override
+                        public void onError(int error) {
+                            listening = false;
+
+                            if (liveConversation &&
+                                    !processing) {
+                                restart();
+                            }
+                        }
+
+                        @Override
+                        public void onResults(Bundle results) {
+                            listening = false;
+
+                            ArrayList<String> data =
+                                    results.getStringArrayList(
+                                            SpeechRecognizer.RESULTS_RECOGNITION
+                                    );
+
+                            if (data == null ||
+                                    data.isEmpty()) {
+                                if (liveConversation) restart();
+                                return;
+                            }
+
+                            String text = data.get(0);
+
+                            handleSpeech(text);
+                        }
+
+                        @Override
+                        public void onPartialResults(Bundle partialResults) {
+                        }
+
+                        @Override
+                        public void onEvent(int eventType, Bundle params) {
+                        }
+                    }
+            );
+        }
     }
 
-    void createNotification() {
-
-        String channel = "maya_voice";
-
+    private Notification buildNotification() {
         if (Build.VERSION.SDK_INT >= 26) {
-
-            NotificationChannel nc =
-                new NotificationChannel(
-                    channel,
-                    "MAYA Voice",
-                    NotificationManager.IMPORTANCE_LOW
-                );
-
-            getSystemService(
-                NotificationManager.class
-            ).createNotificationChannel(nc);
+            return new Notification.Builder(
+                    this,
+                    "maya_voice"
+            )
+                    .setContentTitle("MAYA")
+                    .setContentText("MAYA Voice Agent is active")
+                    .setSmallIcon(
+                            android.R.drawable.ic_btn_speak_now
+                    )
+                    .build();
         }
 
-        Notification.Builder b =
-            Build.VERSION.SDK_INT >= 26
-            ? new Notification.Builder(this, channel)
-            : new Notification.Builder(this);
+        return new Notification.Builder(this)
+                .setContentTitle("MAYA")
+                .setContentText("MAYA Voice Agent is active")
+                .setSmallIcon(
+                        android.R.drawable.ic_btn_speak_now
+                )
+                .build();
+    }
 
-        b.setContentTitle("MAYA")
-         .setContentText(
-             "MAYA Live Voice is active"
-         )
-         .setSmallIcon(
-             android.R.drawable.ic_btn_speak_now
-         );
+    private void createChannel() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            "maya_voice",
+                            "MAYA Voice",
+                            NotificationManager.IMPORTANCE_LOW
+                    );
 
-        startForeground(
-            77,
-            b.build()
+            NotificationManager nm =
+                    getSystemService(
+                            NotificationManager.class
+                    );
+
+            nm.createNotificationChannel(channel);
+        }
+    }
+
+    private void handleSpeech(String raw) {
+        String text =
+                raw == null ? "" : raw.trim();
+
+        if (text.isEmpty()) {
+            if (liveConversation) restart();
+            return;
+        }
+
+        String lower =
+                text.toLowerCase();
+
+        boolean helloMaya =
+                lower.contains("hello maya") ||
+                lower.contains("helo maya") ||
+                lower.contains("हेलो माया") ||
+                lower.contains("हैलो माया");
+
+        boolean helloBoss =
+                lower.contains("hello boss") ||
+                lower.contains("हेलो बॉस");
+
+        boolean mayaWake =
+                lower.equals("maya") ||
+                lower.equals("माया");
+
+        if (helloMaya || helloBoss || mayaWake) {
+            showPopup();
+
+            if (helloMaya || mayaWake) {
+                speak("हाँ बॉस, क्या करना बताइए।");
+            } else {
+                speak("Hello Boss. हाँ, बोलिए।");
+            }
+
+            liveConversation = true;
+            restart();
+            return;
+        }
+
+        if (!liveConversation) {
+            return;
+        }
+
+        final String userText = text;
+
+        if (processing) return;
+
+        processing = true;
+        setStatus("● THINKING");
+
+        handleLocalAction(userText);
+
+        MayaCore.ask(
+                this,
+                userText,
+                (ok, answer) -> {
+
+                    processing = false;
+
+                    runOnUiThread(() -> {
+                        updatePopup(
+                                userText,
+                                answer
+                        );
+                    });
+
+                    speak(answer);
+                    restart();
+                }
         );
     }
 
-    void showPopup() {
+    private void handleLocalAction(String text) {
+        String lower =
+                text.toLowerCase();
 
-        if (popupShowing) {
-            return;
+        if (lower.contains("youtube")) {
+            MayaCore.openApp(
+                    this,
+                    "youtube"
+            );
+        } else if (lower.contains("instagram")) {
+            MayaCore.openApp(
+                    this,
+                    "instagram"
+            );
+        } else if (lower.contains("whatsapp")) {
+            MayaCore.openApp(
+                    this,
+                    "whatsapp"
+            );
+        } else if (lower.contains("telegram")) {
+            MayaCore.openApp(
+                    this,
+                    "telegram"
+            );
+        } else if (lower.contains("chrome")) {
+            MayaCore.openApp(
+                    this,
+                    "chrome"
+            );
+        } else if (lower.contains("gmail")) {
+            MayaCore.openApp(
+                    this,
+                    "gmail"
+            );
+        } else if (lower.contains("canva")) {
+            MayaCore.openApp(
+                    this,
+                    "canva"
+            );
+        } else if (lower.contains("home")) {
+            MayaCore.executeLocalCommand(
+                    this,
+                    "home"
+            );
+        } else if (lower.contains("back")) {
+            MayaCore.executeLocalCommand(
+                    this,
+                    "back"
+            );
+        } else if (lower.contains("recent")) {
+            MayaCore.executeLocalCommand(
+                    this,
+                    "recent"
+            );
+        } else if (lower.contains("notification")) {
+            MayaCore.executeLocalCommand(
+                    this,
+                    "notification"
+            );
         }
 
-        if (Build.VERSION.SDK_INT >= 23 &&
-            !Settings.canDrawOverlays(this)) {
+        if (lower.contains("call") ||
+                lower.contains("कॉल") ||
+                lower.contains("phone")) {
 
-            speak(
-                "MAYA popup के लिए Display over other apps permission चाहिए।"
+            String number =
+                    MayaCore.extractPhoneNumber(text);
+
+            if (!number.isEmpty()) {
+                showCallConfirmation(number);
+            }
+        }
+    }
+
+    private void showCallConfirmation(String number) {
+        if (!popupShowing) showPopup();
+
+        runOnUiThread(() -> {
+            Button call =
+                    new Button(this);
+
+            call.setText(
+                    "CALL " + number
             );
 
+            call.setOnClickListener(v -> {
+                MayaCore.dial(
+                        this,
+                        number
+                );
+
+                call.setText("DIALER OPENED");
+            });
+
+            if (popup != null) {
+                popup.addView(call);
+            }
+        });
+    }
+
+    private void speak(String text) {
+        if (tts == null) return;
+
+        runOnUiThread(() -> {
+            setStatus("● SPEAKING");
+
+            tts.speak(
+                    text == null ? "" : text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    "maya_response"
+            );
+        });
+    }
+
+    private void restart() {
+        if (!liveConversation ||
+                recognizer == null ||
+                processing) return;
+
+        postDelayed(
+                this::listen,
+                700
+        );
+    }
+
+    private void listen() {
+        if (!liveConversation ||
+                recognizer == null ||
+                listening ||
+                processing) {
             return;
         }
 
-        popupShowing = true;
+        listening = true;
+
+        Intent intent =
+                new Intent(
+                        RecognizerIntent.ACTION_RECOGNIZE_SPEECH
+                );
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+        );
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE,
+                "hi-IN"
+        );
+
+        intent.putExtra(
+                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
+                true
+        );
+
+        recognizer.startListening(intent);
+    }
+
+    private void postDelayed(Runnable r, long delay) {
+        new android.os.Handler(
+                getMainLooper()
+        ).postDelayed(r, delay);
+    }
+
+    private void setStatus(String status) {
+        runOnUiThread(() -> {
+            if (popupStatus != null) {
+                popupStatus.setText(status);
+            }
+        });
+    }
+
+    private void updatePopup(
+            String user,
+            String answer
+    ) {
+        if (!popupShowing ||
+                popupChat == null) return;
+
+        popupChat.append(
+                "\n\nYOU\n" +
+                user +
+                "\n\nMAYA\n" +
+                answer
+        );
+    }
+
+    private void showPopup() {
+        if (popupShowing) return;
+
+        if (!Settings.canDrawOverlays(this)) {
+            return;
+        }
+
+        wm =
+                (WindowManager)
+                        getSystemService(
+                                WINDOW_SERVICE
+                        );
 
         popup =
-            new LinearLayout(this);
+                new LinearLayout(this);
 
         popup.setOrientation(
-            LinearLayout.VERTICAL
+                LinearLayout.VERTICAL
         );
 
         popup.setPadding(
-            dp(18),
-            dp(18),
-            dp(18),
-            dp(14)
+                30, 24, 30, 24
         );
 
-        GradientDrawable background =
-            new GradientDrawable();
-
-        background.setColor(
-            Color.rgb(7,12,20)
+        popup.setBackgroundColor(
+                Color.rgb(8, 15, 22)
         );
 
-        background.setCornerRadius(
-            dp(28)
+        TextView title =
+                new TextView(this);
+
+        title.setText(
+                "◉  MAYA  •  LIVE"
         );
 
-        background.setStroke(
-            dp(1),
-            Color.rgb(55,130,165)
-        );
-
-        popup.setBackground(background);
-
-        TextView header =
-            new TextView(this);
-
-        header.setText(
-            "◉  MAYA"
-        );
-
-        header.setTextColor(cyan);
-        header.setTextSize(24);
-        header.setTypeface(
-            Typeface.DEFAULT,
-            Typeface.BOLD
-        );
-
-        popup.addView(header);
-
-        TextView sub =
-            new TextView(this);
-
-        sub.setText(
-            "AI VOICE • LIVE CONVERSATION"
-        );
-
-        sub.setTextColor(muted);
-        sub.setTextSize(10);
-
-        popup.addView(sub);
+        title.setTextColor(cyan);
+        title.setTextSize(21);
+        title.setPadding(0, 0, 0, 12);
 
         popupStatus =
-            new TextView(this);
+                new TextView(this);
 
         popupStatus.setText(
-            "● LISTENING"
+                "● AWAKENED"
         );
 
-        popupStatus.setTextColor(cyan);
-        popupStatus.setTextSize(14);
-        popupStatus.setPadding(
-            0,
-            dp(12),
-            0,
-            dp(8)
+        popupStatus.setTextColor(
+                Color.WHITE
         );
 
-        popup.addView(popupStatus);
+        popupStatus.setTextSize(13);
+
+        popupChat =
+                new TextView(this);
+
+        popupChat.setTextColor(
+                Color.LTGRAY
+        );
+
+        popupChat.setTextSize(15);
 
         ScrollView scroll =
-            new ScrollView(this);
+                new ScrollView(this);
 
-        popupConversation =
-            new TextView(this);
+        scroll.addView(popupChat);
 
-        popupConversation.setText(
-            "MAYA\n\nहाँ, बोलिए। मैं आपके लिए क्या कर सकती हूँ?"
-        );
+        Button end =
+                new Button(this);
 
-        popupConversation.setTextColor(white);
-        popupConversation.setTextSize(15);
-        popupConversation.setPadding(
-            dp(12),
-            dp(12),
-            dp(12),
-            dp(12)
-        );
+        end.setText("END MAYA LIVE");
 
-        GradientDrawable chatBg =
-            new GradientDrawable();
-
-        chatBg.setColor(
-            Color.rgb(12,20,31)
-        );
-
-        chatBg.setCornerRadius(
-            dp(18)
-        );
-
-        popupConversation.setBackground(
-            chatBg
-        );
-
-        scroll.addView(
-            popupConversation,
-            new ScrollView.LayoutParams(
-                -1,
-                dp(190)
-            )
-        );
-
-        popup.addView(
-            scroll,
-            new LinearLayout.LayoutParams(
-                -1,
-                dp(190)
-            )
-        );
-
-        Button close =
-            new Button(this);
-
-        close.setText(
-            "END MAYA LIVE"
-        );
-
-        close.setTextColor(white);
-        close.setAllCaps(false);
-        close.setBackgroundColor(
-            Color.rgb(25,35,47)
-        );
-
-        popup.addView(close);
-
-        close.setOnClickListener(v -> {
-
+        end.setOnClickListener(v -> {
             liveConversation = false;
-            hidePopup();
-
-            speak(
-                "ठीक है Boss. मैं ready हूँ।"
-            );
-        });
-
-        WindowManager.LayoutParams lp;
-
-        if (Build.VERSION.SDK_INT >= 26) {
-
-            lp =
-                new WindowManager.LayoutParams(
-                    dp(340),
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                    android.graphics.PixelFormat.TRANSLUCENT
-                );
-
-        } else {
-
-            lp =
-                new WindowManager.LayoutParams(
-                    dp(340),
-                    WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.TYPE_PHONE,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                    android.graphics.PixelFormat.TRANSLUCENT
-                );
-        }
-
-        lp.gravity = Gravity.CENTER;
-        lp.y = -dp(40);
-
-        try {
-
-            windowManager.addView(
-                popup,
-                lp
-            );
-
-        } catch (Exception e) {
-
-            popupShowing = false;
-            popup = null;
-        }
-    }
-
-    void hidePopup() {
-
-        if (popup != null && popupShowing) {
-
-            try {
-                windowManager.removeView(popup);
-            } catch (Exception ignored) {}
-        }
-
-        popup = null;
-        popupShowing = false;
-    }
-
-    void updatePopup(
-        String user,
-        String maya
-    ) {
-
-        if (popupConversation == null) {
-            return;
-        }
-
-        runOnMain(() -> {
-
-            popupConversation.setText(
-                "YOU\n" +
-                user +
-                "\n\n" +
-                "MAYA\n" +
-                maya
-            );
-
-            popupStatus.setText(
-                "● MAYA IS SPEAKING"
-            );
-
-            popupStatus.setTextColor(
-                Color.rgb(14,203,129)
-            );
-        });
-    }
-
-    void runOnMain(Runnable r) {
-        handler.post(r);
-    }
-
-    void startListening() {
-
-        if (processing) {
-            return;
-        }
-
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-
-            speak(
-                "Speech recognition available नहीं है।"
-            );
-
-            return;
-        }
-
-        try {
+            processing = false;
 
             if (recognizer != null) {
-                recognizer.destroy();
-            }
-
-            recognizer =
-                SpeechRecognizer.createSpeechRecognizer(
-                    this
-                );
-
-            recognizer.setRecognitionListener(
-                new RecognitionListener() {
-
-                    @Override
-                    public void onResults(
-                        Bundle results
-                    ) {
-
-                        ArrayList<String> list =
-                            results.getStringArrayList(
-                                SpeechRecognizer.RESULTS_RECOGNITION
-                            );
-
-                        if (list == null ||
-                            list.isEmpty()) {
-
-                            restart();
-                            return;
-                        }
-
-                        handle(
-                            list.get(0)
-                        );
-                    }
-
-                    @Override
-                    public void onError(int e) {
-                        restart();
-                    }
-
-                    @Override
-                    public void onReadyForSpeech(
-                        Bundle b
-                    ) {
-
-                        if (popupShowing) {
-
-                            popupStatus.setText(
-                                "● LISTENING"
-                            );
-
-                            popupStatus.setTextColor(
-                                cyan
-                            );
-                        }
-                    }
-
-                    @Override
-                    public void onBeginningOfSpeech() {}
-
-                    @Override
-                    public void onRmsChanged(float r) {}
-
-                    @Override
-                    public void onBufferReceived(
-                        byte[] b
-                    ) {}
-
-                    @Override
-                    public void onEndOfSpeech() {}
-
-                    @Override
-                    public void onPartialResults(
-                        Bundle b
-                    ) {}
-
-                    @Override
-                    public void onEvent(
-                        int a,
-                        Bundle b
-                    ) {}
+                try {
+                    recognizer.stopListening();
+                } catch (Exception ignored) {
                 }
-            );
-
-            Intent i =
-                new Intent(
-                    RecognizerIntent.ACTION_RECOGNIZE_SPEECH
-                );
-
-            i.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
-            );
-
-            i.putExtra(
-                RecognizerIntent.EXTRA_LANGUAGE,
-                "hi-IN"
-            );
-
-            i.putExtra(
-                RecognizerIntent.EXTRA_PARTIAL_RESULTS,
-                false
-            );
-
-            recognizer.startListening(i);
-
-        } catch (Exception ignored) {
-
-            restart();
-        }
-    }
-
-    void handle(String heard) {
-
-        if (heard == null) {
-            restart();
-            return;
-        }
-
-        String original =
-            heard.trim();
-
-        String lower =
-            original.toLowerCase(
-                Locale.ROOT
-            );
-
-        boolean helloMaya =
-            lower.contains("hello maya") ||
-            lower.contains("helo maya") ||
-            original.contains("हेलो माया") ||
-            original.contains("हैलो माया");
-
-        boolean mayaWord =
-            lower.contains("maya") ||
-            original.contains("माया");
-
-        if (!liveConversation &&
-            !helloMaya &&
-            !mayaWord) {
-
-            restart();
-            return;
-        }
-
-        String text = original;
-
-        text =
-            text.replaceAll(
-                "(?i)hello\\s+maya",
-                ""
-            );
-
-        text =
-            text.replaceAll(
-                "(?i)helo\\s+maya",
-                ""
-            );
-
-        text =
-            text.replaceAll(
-                "(?i)maya",
-                ""
-            );
-
-        text =
-            text.replace(
-                "हेलो माया",
-                ""
-            );
-
-        text =
-            text.replace(
-                "हैलो माया",
-                ""
-            );
-
-        text =
-            text.replace(
-                "माया",
-                ""
-            )
-            .trim();
-
-        if (!liveConversation) {
-
-            liveConversation = true;
-
-            showPopup();
-
-            if (text.isEmpty()) {
-
-                speak(
-                    "हाँ, बोलिए। मैं आपके लिए क्या कर सकती हूँ?"
-                );
-
-                restart();
-                return;
             }
-        }
 
-        if (text.isEmpty()) {
+            removePopup();
+        });
 
-            restart();
-            return;
-        }
-
-        processing = true;
-
-        if (popupStatus != null) {
-
-            popupStatus.setText(
-                "● THINKING"
-            );
-
-            popupStatus.setTextColor(cyan);
-        }
-
-        MayaCore.ask(
-            this,
-            text,
-            (ok, answer) -> {
-
-                processing = false;
-
-                if (popupShowing) {
-
-                    updatePopup(
-                        text,
-                        answer
-                    );
-                }
-
-                speak(answer);
-
-                restart();
-            }
+        popup.addView(title);
+        popup.addView(popupStatus);
+        popup.addView(scroll,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        0,
+                        1
+                )
         );
-    }
+        popup.addView(end);
 
-    void speak(String text) {
+        WindowManager.LayoutParams lp =
+                new WindowManager.LayoutParams(
+                        (int)(340 *
+                                getResources()
+                                        .getDisplayMetrics()
+                                        .density),
+                        (int)(470 *
+                                getResources()
+                                        .getDisplayMetrics()
+                                        .density),
+                        Build.VERSION.SDK_INT >= 26
+                                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                                : WindowManager.LayoutParams.TYPE_PHONE,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                );
 
-        if (tts == null) {
-            return;
-        }
+        lp.gravity = Gravity.CENTER;
 
         try {
-
-            tts.speak(
-                text,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "maya_reply"
-            );
-
-        } catch (Exception ignored) {}
+            wm.addView(popup, lp);
+            popupShowing = true;
+        } catch (Exception ignored) {
+        }
     }
 
-    void restart() {
+    private void removePopup() {
+        if (!popupShowing ||
+                wm == null ||
+                popup == null) return;
 
-        handler.postDelayed(
-            this::startListening,
-            900
-        );
-    }
+        try {
+            wm.removeView(popup);
+        } catch (Exception ignored) {
+        }
 
-    int dp(int n) {
-
-        return (int)(
-            n *
-            getResources()
-                .getDisplayMetrics()
-                .density
-        );
+        popupShowing = false;
+        popup = null;
+        popupStatus = null;
+        popupChat = null;
     }
 
     @Override
     public int onStartCommand(
-        Intent intent,
-        int flags,
-        int startId
+            Intent intent,
+            int flags,
+            int startId
     ) {
-
+        liveConversation = true;
+        restart();
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
-
         liveConversation = false;
 
-        hidePopup();
-
         if (recognizer != null) {
-            recognizer.destroy();
+            try {
+                recognizer.destroy();
+            } catch (Exception ignored) {
+            }
         }
 
         if (tts != null) {
@@ -682,13 +604,13 @@ public class MayaVoiceService extends Service {
             tts.shutdown();
         }
 
+        removePopup();
+
         super.onDestroy();
     }
 
     @Override
-    public android.os.IBinder onBind(
-        Intent intent
-    ) {
+    public IBinder onBind(Intent intent) {
         return null;
     }
 }

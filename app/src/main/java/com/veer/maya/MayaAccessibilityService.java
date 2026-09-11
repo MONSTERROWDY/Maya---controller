@@ -3,12 +3,13 @@ package com.veer.maya;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.graphics.Path;
+import android.os.Bundle;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityEvent;
 
-public class MayaAccessibilityService
-        extends AccessibilityService {
+public class MayaAccessibilityService extends AccessibilityService {
 
-    static MayaAccessibilityService instance;
+    private static MayaAccessibilityService instance;
 
     @Override
     protected void onServiceConnected() {
@@ -16,165 +17,106 @@ public class MayaAccessibilityService
         instance = this;
     }
 
-    public static MayaAccessibilityService getInstance() {
-        return instance;
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
     }
 
-    public void executeCommand(String command) {
-        if (command == null) return;
+    @Override
+    public void onInterrupt() {
+    }
 
-        String c = command.trim();
-        String l = c.toLowerCase(java.util.Locale.ROOT);
+    @Override
+    public void onDestroy() {
+        if (instance == this) instance = null;
+        super.onDestroy();
+    }
 
-        if (l.equals("home") || l.contains("go home") || c.contains("होम")) {
-            home();
-            return;
-        }
-
-        if (l.equals("back") || l.contains("go back") || c.contains("बैक")) {
-            back();
-            return;
-        }
-
-        if (l.equals("recent") || l.contains("recent apps") || c.contains("रीसेंट")) {
-            recent();
-            return;
-        }
-
-        if (l.contains("notification") || c.contains("नोटिफिकेशन")) {
-            openNotifications();
-            return;
-        }
-
-        if (l.startsWith("type ")) {
-            typeText(c.substring(5).trim());
-        }
+    public static MayaAccessibilityService getInstance() {
+        return instance;
     }
 
     public static boolean isReady() {
         return instance != null;
     }
 
-    public static void home() {
-        if (instance != null) {
-            instance.performGlobalAction(
-                GLOBAL_ACTION_HOME
-            );
-        }
+    public boolean home() {
+        return performGlobalAction(GLOBAL_ACTION_HOME);
     }
 
-    public static void back() {
-        if (instance != null) {
-            instance.performGlobalAction(
-                GLOBAL_ACTION_BACK
-            );
-        }
+    public boolean back() {
+        return performGlobalAction(GLOBAL_ACTION_BACK);
     }
 
-    public static void recent() {
-        if (instance != null) {
-            instance.performGlobalAction(
-                GLOBAL_ACTION_RECENTS
-            );
-        }
+    public boolean recent() {
+        return performGlobalAction(GLOBAL_ACTION_RECENTS);
     }
 
-    public static void openNotifications() {
-        if (instance != null) {
-            instance.performGlobalAction(
-                GLOBAL_ACTION_NOTIFICATIONS
-            );
-        }
+    public boolean notifications() {
+        return performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
     }
 
-    public static void tap(float x, float y) {
-
-        if (instance == null) return;
-
-        Path path = new Path();
-        path.moveTo(x,y);
-
-        GestureDescription.StrokeDescription stroke =
-            new GestureDescription.StrokeDescription(
-                path,
-                0,
-                80
-            );
-
-        GestureDescription gesture =
-            new GestureDescription.Builder()
-                .addStroke(stroke)
-                .build();
-
-        instance.dispatchGesture(
-            gesture,
-            null,
-            null
-        );
-    }
-
-    public static boolean typeText(String text) {
-
-        if (instance == null) return false;
-
-        AccessibilityNodeInfo root =
-            instance.getRootInActiveWindow();
-
+    public boolean typeText(String text) {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return false;
 
-        AccessibilityNodeInfo node =
-            findEditable(root);
+        AccessibilityNodeInfo target = findEditable(root);
+        if (target == null) return false;
 
-        if (node == null) return false;
-
-        android.os.Bundle args =
-            new android.os.Bundle();
-
+        Bundle args = new Bundle();
         args.putCharSequence(
-            AccessibilityNodeInfo
-                .ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-            text
+                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                text
         );
 
-        return node.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            args
+        return target.performAction(
+                AccessibilityNodeInfo.ACTION_SET_TEXT,
+                args
         );
     }
 
-    static AccessibilityNodeInfo findEditable(
-        AccessibilityNodeInfo node
-    ) {
-
+    private AccessibilityNodeInfo findEditable(AccessibilityNodeInfo node) {
         if (node == null) return null;
 
-        if (node.isEditable()) {
-            return node;
-        }
+        if (node.isEditable()) return node;
 
-        for (int i=0;
-             i<node.getChildCount();
-             i++) {
-
-            AccessibilityNodeInfo child =
-                node.getChild(i);
-
-            AccessibilityNodeInfo result =
-                findEditable(child);
-
-            if (result != null) {
-                return result;
-            }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            AccessibilityNodeInfo result = findEditable(child);
+            if (result != null) return result;
         }
 
         return null;
     }
 
-    @Override
-    public void onAccessibilityEvent(
-        android.view.accessibility.AccessibilityEvent event
-    ) {}
+    public boolean tap(float x, float y) {
+        Path path = new Path();
+        path.moveTo(x, y);
 
-    @Override
-    public void onInterrupt() {}
+        GestureDescription gesture =
+                new GestureDescription.Builder()
+                        .addStroke(
+                                new GestureDescription.StrokeDescription(
+                                        path, 0, 100
+                                )
+                        )
+                        .build();
+
+        return dispatchGesture(gesture, null, null);
+    }
+
+    public void executeCommand(String command) {
+        if (command == null) return;
+
+        String c = command.toLowerCase();
+
+        if (c.contains("home")) {
+            home();
+        } else if (c.contains("back")) {
+            back();
+        } else if (c.contains("recent")) {
+            recent();
+        } else if (c.contains("notification")) {
+            notifications();
+        }
+    }
 }

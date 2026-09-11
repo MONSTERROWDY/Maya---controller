@@ -1,9 +1,13 @@
 package com.veer.maya;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Handler;
-import android.os.Looper;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.provider.Settings;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -14,304 +18,593 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.net.URLEncoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-public final class MayaCore {
+public class MayaCore {
 
-    private static final String PREF = "maya_secure";
-    private static final String API_KEY = "api_key";
-    private static final String ENDPOINT = "endpoint";
-    private static final String MODEL = "model";
+    private static final String PREF = "maya_settings";
 
-    private MayaCore(){}
+    public interface Callback {
+        void done(boolean ok, String answer);
+    }
 
-    public static SharedPreferences prefs(Context c) {
+    private static SharedPreferences prefs(Context c) {
         return c.getSharedPreferences(PREF, Context.MODE_PRIVATE);
     }
 
-    public static void saveApi(Context c, String key) {
-        prefs(c).edit().putString(API_KEY, key == null ? "" : key.trim()).apply();
+    public static String getGeminiKey(Context c) {
+        return prefs(c).getString("gemini_key", "");
     }
 
-    public static String getApi(Context c) {
-        return prefs(c).getString(API_KEY, "").trim();
+    public static String getGeminiModel(Context c) {
+        return prefs(c).getString("gemini_model", "gemini-3.8-flash");
     }
 
-    public static void saveEndpoint(Context c, String endpoint) {
-        prefs(c).edit().putString(ENDPOINT, endpoint.trim()).apply();
+    public static String getOpenAIKey(Context c) {
+        return prefs(c).getString("openai_key", "");
     }
 
-    public static String getEndpoint(Context c) {
-        return prefs(c).getString(
-            ENDPOINT,
-            "https://api.openai.com/v1/responses"
-        ).trim();
+    public static String getOpenAIModel(Context c) {
+        return prefs(c).getString("openai_model", "");
     }
 
-    public static void saveModel(Context c, String model) {
-        prefs(c).edit().putString(MODEL, model.trim()).apply();
+    public static String getProvider(Context c) {
+        return prefs(c).getString("provider", "Gemini");
     }
 
-    public static String getModel(Context c) {
-        return prefs(c).getString(MODEL, "gpt-5.6-luna").trim();
+    public static void saveSettings(
+            Context c,
+            String geminiKey,
+            String geminiModel,
+            String openAIKey,
+            String openAIModel,
+            String provider
+    ) {
+        prefs(c).edit()
+                .putString("gemini_key", geminiKey == null ? "" : geminiKey.trim())
+                .putString("gemini_model", geminiModel == null ? "" : geminiModel.trim())
+                .putString("openai_key", openAIKey == null ? "" : openAIKey.trim())
+                .putString("openai_model", openAIModel == null ? "" : openAIModel.trim())
+                .putString("provider", provider == null ? "Gemini" : provider)
+                .apply();
     }
 
-    public static boolean hasApi(Context c) {
-        return !getApi(c).isEmpty();
-    }
-
-    public static void ask(
-            Context context,
-            String userText,
-            Callback callback) {
-
-        String key = getApi(context);
-
-        if (key.isEmpty()) {
-            callback.done(
-                false,
-                "API KEY MISSING\n\nSettings → API Key में अपनी API key save करें।"
-            );
-            return;
-        }
-
-        if (userText == null || userText.trim().isEmpty()) {
-            callback.done(false, "कोई command नहीं मिली।");
-            return;
-        }
-
+    public static void ask(Context c, String text, Callback callback) {
         new Thread(() -> {
-
-            HttpURLConnection conn = null;
-
             try {
-                URL url = new URL(getEndpoint(context));
+                String provider = getProvider(c);
 
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("POST");
+                if ("OpenAI".equalsIgnoreCase(provider)) {
+                    String key = getOpenAIKey(c);
 
-                // IMPORTANT:
-                // Correct API headers. This avoids the old authentication error.
-                conn.setRequestProperty(
-                    "Authorization",
-                    "Bearer " + key
-                );
-
-                conn.setRequestProperty(
-                    "Content-Type",
-                    "application/json; charset=UTF-8"
-                );
-
-                conn.setRequestProperty(
-                    "Accept",
-                    "application/json"
-                );
-
-                conn.setConnectTimeout(20000);
-                conn.setReadTimeout(60000);
-                conn.setDoOutput(true);
-
-                JSONObject body = new JSONObject();
-
-                body.put("model", getModel(context));
-
-                JSONArray input = new JSONArray();
-
-                JSONObject message = new JSONObject();
-                message.put("role", "user");
-
-                JSONArray content = new JSONArray();
-
-                JSONObject text = new JSONObject();
-                text.put("type", "input_text");
-                text.put(
-                    "text",
-                    "You are MAYA, a practical Android AI assistant. " +
-                    "Reply naturally in Hindi/Hinglish when appropriate. " +
-                    "User command: " + userText
-                );
-
-                content.put(text);
-                message.put("content", content);
-                input.put(message);
-
-                body.put("input", input);
-
-                byte[] bytes = body.toString()
-                    .getBytes(StandardCharsets.UTF_8);
-
-                try (OutputStream os = conn.getOutputStream()) {
-                    os.write(bytes);
-                }
-
-                int code = conn.getResponseCode();
-
-                InputStream stream =
-                    code >= 200 && code < 300
-                    ? conn.getInputStream()
-                    : conn.getErrorStream();
-
-                StringBuilder result = new StringBuilder();
-
-                if (stream != null) {
-                    BufferedReader br = new BufferedReader(
-                        new InputStreamReader(
-                            stream,
-                            StandardCharsets.UTF_8
-                        )
-                    );
-
-                    String line;
-
-                    while ((line = br.readLine()) != null) {
-                        result.append(line);
+                    if (key.isEmpty()) {
+                        callback.done(false,
+                                "OpenAI API Token सेट नहीं है। Settings में token डालिए।");
+                        return;
                     }
 
-                    br.close();
+                    String model = getOpenAIModel(c);
+
+                    if (model.isEmpty()) {
+                        callback.done(false,
+                                "OpenAI Model खाली है। Settings में अपना उपलब्ध API model डालिए।");
+                        return;
+                    }
+
+                    callOpenAI(c, key, model, text, callback);
+
+                } else {
+                    String key = getGeminiKey(c);
+
+                    if (key.isEmpty()) {
+                        callback.done(false,
+                                "Gemini API Token सेट नहीं है। Settings में token डालिए।");
+                        return;
+                    }
+
+                    String model = getGeminiModel(c);
+
+                    if (model.isEmpty()) {
+                        model = "gemini-3.8-flash";
+                    }
+
+                    callGemini(c, key, model, text, callback);
                 }
-
-                String raw = result.toString();
-
-                if (code < 200 || code >= 300) {
-
-                    String error = raw;
-
-                    try {
-                        JSONObject e = new JSONObject(raw);
-
-                        if (e.has("error")) {
-                            Object obj = e.get("error");
-
-                            if (obj instanceof JSONObject) {
-                                JSONObject eo = (JSONObject)obj;
-                                error = eo.optString(
-                                    "message",
-                                    raw
-                                );
-                            }
-                        }
-                    } catch (Exception ignored) {}
-
-                    callback.done(
-                        false,
-                        "API ERROR (" + code + ")\n\n" + error
-                    );
-
-                    return;
-                }
-
-                String answer = extractText(raw);
-
-                if (answer.isEmpty()) {
-                    answer = raw;
-                }
-
-                callback.done(true, answer);
 
             } catch (Exception e) {
-
-                callback.done(
-                    false,
-                    "NETWORK/API ERROR\n\n" +
-                    safeMessage(e)
-                );
-
-            } finally {
-
-                if (conn != null) {
-                    conn.disconnect();
-                }
+                callback.done(false, "MAYA Error: " + safeError(e));
             }
-
         }).start();
     }
 
-    public static void confirmPending(Context context) {
-        String command = MayaCommandReceiver.takePendingCommand(context);
-        if (command != null && MayaAccessibilityService.isReady()) {
-            MayaAccessibilityService.getInstance().executeCommand(command);
+    private static void callGemini(
+            Context c,
+            String key,
+            String model,
+            String text,
+            Callback callback
+    ) throws Exception {
+
+        String cleanModel = model.startsWith("models/")
+                ? model.substring(7)
+                : model;
+
+        String endpoint =
+                "https://generativelanguage.googleapis.com/v1beta/models/"
+                        + URLEncoder.encode(cleanModel, "UTF-8")
+                        + ":generateContent";
+
+        JSONObject root = new JSONObject();
+
+        JSONArray contents = new JSONArray();
+        JSONObject content = new JSONObject();
+
+        JSONArray parts = new JSONArray();
+        JSONObject part = new JSONObject();
+
+        String prompt = systemPrompt() + "\n\nUSER:\n" + text;
+
+        part.put("text", prompt);
+        parts.put(part);
+
+        content.put("parts", parts);
+        contents.put(content);
+
+        root.put("contents", contents);
+
+        String response = post(
+                endpoint,
+                root.toString(),
+                "x-goog-api-key",
+                key
+        );
+
+        JSONObject obj = new JSONObject(response);
+
+        if (obj.has("error")) {
+            JSONObject error = obj.optJSONObject("error");
+            callback.done(false,
+                    error == null
+                            ? "Gemini API Error"
+                            : error.optString("message", "Gemini API Error"));
+            return;
         }
-    }
 
-    public static void cancelPending(Context context) {
-        context.getSharedPreferences(
-            "maya_controller",
-            Context.MODE_PRIVATE
-        ).edit().remove("pending_command").apply();
-    }
+        String answer = "";
 
-    private static String extractText(String raw) {
+        JSONArray candidates = obj.optJSONArray("candidates");
 
-        try {
+        if (candidates != null && candidates.length() > 0) {
+            JSONObject candidate = candidates.optJSONObject(0);
 
-            JSONObject root = new JSONObject(raw);
+            if (candidate != null) {
+                JSONObject contentObj =
+                        candidate.optJSONObject("content");
 
-            String direct =
-                root.optString("output_text", "");
+                if (contentObj != null) {
+                    JSONArray p =
+                            contentObj.optJSONArray("parts");
 
-            if (!direct.isEmpty()) {
-                return direct;
-            }
+                    if (p != null) {
+                        StringBuilder sb = new StringBuilder();
 
-            JSONArray output =
-                root.optJSONArray("output");
+                        for (int i = 0; i < p.length(); i++) {
+                            JSONObject pp = p.optJSONObject(i);
 
-            if (output == null) {
-                return "";
-            }
+                            if (pp != null) {
+                                String t = pp.optString("text", "");
 
-            StringBuilder all =
-                new StringBuilder();
-
-            for (int i = 0; i < output.length(); i++) {
-
-                JSONObject item =
-                    output.optJSONObject(i);
-
-                if (item == null) continue;
-
-                JSONArray content =
-                    item.optJSONArray("content");
-
-                if (content == null) continue;
-
-                for (int j = 0; j < content.length(); j++) {
-
-                    JSONObject c =
-                        content.optJSONObject(j);
-
-                    if (c == null) continue;
-
-                    String t =
-                        c.optString("text", "");
-
-                    if (!t.isEmpty()) {
-                        if (all.length() > 0) {
-                            all.append("\n");
+                                if (!t.isEmpty()) {
+                                    if (sb.length() > 0) sb.append("\n");
+                                    sb.append(t);
+                                }
+                            }
                         }
-                        all.append(t);
+
+                        answer = sb.toString();
                     }
                 }
             }
+        }
 
-            return all.toString().trim();
+        if (answer.isEmpty()) {
+            answer = "Gemini ने कोई text response नहीं दिया।";
+        }
+
+        remember(c, text, answer);
+        callback.done(true, answer);
+    }
+
+    private static void callOpenAI(
+            Context c,
+            String key,
+            String model,
+            String text,
+            Callback callback
+    ) throws Exception {
+
+        JSONObject root = new JSONObject();
+
+        root.put("model", model);
+        root.put(
+                "input",
+                systemPrompt() + "\n\nUSER:\n" + text
+        );
+
+        String response = post(
+                "https://api.openai.com/v1/responses",
+                root.toString(),
+                "Authorization",
+                "Bearer " + key
+        );
+
+        JSONObject obj = new JSONObject(response);
+
+        if (obj.has("error")) {
+            JSONObject error = obj.optJSONObject("error");
+
+            callback.done(false,
+                    error == null
+                            ? "OpenAI API Error"
+                            : error.optString(
+                                    "message",
+                                    "OpenAI API Error"
+                            ));
+            return;
+        }
+
+        String answer = obj.optString("output_text", "");
+
+        if (answer.isEmpty()) {
+            JSONArray output = obj.optJSONArray("output");
+
+            if (output != null) {
+                StringBuilder sb = new StringBuilder();
+
+                for (int i = 0; i < output.length(); i++) {
+                    JSONObject item = output.optJSONObject(i);
+
+                    if (item == null) continue;
+
+                    JSONArray content =
+                            item.optJSONArray("content");
+
+                    if (content == null) continue;
+
+                    for (int j = 0; j < content.length(); j++) {
+                        JSONObject block =
+                                content.optJSONObject(j);
+
+                        if (block != null) {
+                            String t =
+                                    block.optString("text", "");
+
+                            if (!t.isEmpty()) {
+                                if (sb.length() > 0) sb.append("\n");
+                                sb.append(t);
+                            }
+                        }
+                    }
+                }
+
+                answer = sb.toString();
+            }
+        }
+
+        if (answer.isEmpty()) {
+            answer = "OpenAI ने कोई text response नहीं दिया।";
+        }
+
+        remember(c, text, answer);
+        callback.done(true, answer);
+    }
+
+    private static String post(
+            String endpoint,
+            String body,
+            String headerName,
+            String headerValue
+    ) throws Exception {
+
+        URL url = new URL(endpoint);
+
+        HttpURLConnection conn =
+                (HttpURLConnection) url.openConnection();
+
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(20000);
+        conn.setReadTimeout(60000);
+        conn.setDoOutput(true);
+
+        conn.setRequestProperty(
+                "Content-Type",
+                "application/json; charset=UTF-8"
+        );
+
+        conn.setRequestProperty(
+                "Accept",
+                "application/json"
+        );
+
+        conn.setRequestProperty(
+                headerName,
+                headerValue
+        );
+
+        byte[] data =
+                body.getBytes("UTF-8");
+
+        OutputStream os =
+                conn.getOutputStream();
+
+        os.write(data);
+        os.flush();
+        os.close();
+
+        int code =
+                conn.getResponseCode();
+
+        InputStream stream =
+                code >= 400
+                        ? conn.getErrorStream()
+                        : conn.getInputStream();
+
+        String result = read(stream);
+
+        if (code < 200 || code >= 300) {
+            throw new Exception(
+                    "HTTP " + code + ": " + extractApiError(result)
+            );
+        }
+
+        return result;
+    }
+
+    private static String read(InputStream stream)
+            throws Exception {
+
+        if (stream == null) return "";
+
+        BufferedReader reader =
+                new BufferedReader(
+                        new InputStreamReader(
+                                stream,
+                                "UTF-8"
+                        )
+                );
+
+        StringBuilder sb =
+                new StringBuilder();
+
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+            sb.append(line);
+        }
+
+        reader.close();
+
+        return sb.toString();
+    }
+
+    private static String extractApiError(String value) {
+        try {
+            JSONObject obj =
+                    new JSONObject(value);
+
+            JSONObject error =
+                    obj.optJSONObject("error");
+
+            if (error != null) {
+                return error.optString(
+                        "message",
+                        value
+                );
+            }
+
+            return value;
 
         } catch (Exception e) {
-            return "";
+            return value;
         }
     }
 
-    private static String safeMessage(Exception e) {
-        String s = e.getMessage();
+    private static String safeError(Exception e) {
+        String m = e.getMessage();
 
-        if (s == null || s.trim().isEmpty()) {
+        if (m == null || m.isEmpty()) {
             return e.getClass().getSimpleName();
         }
 
-        return s;
+        return m;
     }
 
-    public interface Callback {
-        void done(boolean success, String text);
+    private static String systemPrompt() {
+        return
+                "You are MAYA, a Hindi/Hinglish Android AI assistant. " +
+                "Be concise, useful and action-oriented. " +
+                "When the user asks for an Android action, clearly identify " +
+                "the intended action. Never claim an action was completed " +
+                "unless the Android agent actually performed it.";
+    }
+
+    private static void remember(
+            Context c,
+            String question,
+            String answer
+    ) {
+        String old =
+                MayaMemory.get(c, "conversation");
+
+        String entry =
+                "\nUSER: " + question +
+                "\nMAYA: " + answer;
+
+        String combined =
+                (old + entry);
+
+        if (combined.length() > 12000) {
+            combined =
+                    combined.substring(
+                            combined.length() - 12000
+                    );
+        }
+
+        MayaMemory.save(
+                c,
+                "conversation",
+                combined
+        );
+    }
+
+    public static boolean openApp(Context c, String name) {
+        String n = name.toLowerCase();
+
+        String pkg = null;
+
+        if (n.contains("youtube")) {
+            pkg = "com.google.android.youtube";
+        } else if (n.contains("instagram")) {
+            pkg = "com.instagram.android";
+        } else if (n.contains("whatsapp")) {
+            pkg = "com.whatsapp";
+        } else if (n.contains("telegram")) {
+            pkg = "org.telegram.messenger";
+        } else if (n.contains("facebook")) {
+            pkg = "com.facebook.katana";
+        } else if (n.contains("chrome")) {
+            pkg = "com.android.chrome";
+        } else if (n.contains("gmail")) {
+            pkg = "com.google.android.gm";
+        } else if (n.contains("canva")) {
+            pkg = "com.canva.editor";
+        } else if (n.contains("play store") ||
+                   n.contains("playstore")) {
+            pkg = "com.android.vending";
+        }
+
+        if (pkg == null) return false;
+
+        try {
+            Intent i =
+                    c.getPackageManager()
+                            .getLaunchIntentForPackage(pkg);
+
+            if (i == null) return false;
+
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean webSearch(
+            Context c,
+            String query
+    ) {
+        try {
+            Intent i =
+                    new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse(
+                                    "https://www.google.com/search?q="
+                                            + URLEncoder.encode(
+                                                    query,
+                                                    "UTF-8"
+                                            )
+                            )
+                    );
+
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static boolean dial(
+            Context c,
+            String number
+    ) {
+        try {
+            Intent i =
+                    new Intent(
+                            Intent.ACTION_DIAL,
+                            Uri.parse("tel:" + number)
+                    );
+
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+
+            return true;
+
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public static void executeLocalCommand(
+            Context c,
+            String command
+    ) {
+        String x =
+                command.toLowerCase();
+
+        if (x.contains("home")) {
+            MayaAccessibilityService s =
+                    MayaAccessibilityService.getInstance();
+
+            if (s != null) s.home();
+
+            return;
+        }
+
+        if (x.contains("back")) {
+            MayaAccessibilityService s =
+                    MayaAccessibilityService.getInstance();
+
+            if (s != null) s.back();
+
+            return;
+        }
+
+        if (x.contains("recent")) {
+            MayaAccessibilityService s =
+                    MayaAccessibilityService.getInstance();
+
+            if (s != null) s.recent();
+
+            return;
+        }
+
+        if (x.contains("notification")) {
+            MayaAccessibilityService s =
+                    MayaAccessibilityService.getInstance();
+
+            if (s != null) s.notifications();
+        }
+    }
+
+    public static String extractPhoneNumber(
+            String text
+    ) {
+        Matcher m =
+                Pattern.compile(
+                        "(\\+?\\d[\\d\\s-]{7,})"
+                ).matcher(text);
+
+        if (!m.find()) return "";
+
+        return m.group(1)
+                .replaceAll("[^0-9+]", "");
     }
 }

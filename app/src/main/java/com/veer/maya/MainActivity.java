@@ -3,593 +3,492 @@ package com.veer.maya;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
-import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.*;
-
-import org.json.JSONObject;
-
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Scanner;
 
 public class MainActivity extends Activity {
 
-    LinearLayout root;
-    TextView status;
-    TextView response;
-    EditText input;
-    EditText api;
-    EditText endpoint;
-    EditText model;
-    HudView hud;
+    private EditText geminiKey;
+    private EditText geminiModel;
+    private EditText openAIKey;
+    private EditText openAIModel;
 
-    Handler handler = new Handler();
+    private RadioButton geminiRadio;
+    private RadioButton openAIRadio;
 
-    int cyan = Color.rgb(93,220,255);
-    int white = Color.WHITE;
-    int muted = Color.rgb(150,165,180);
-    int panel = Color.rgb(13,19,27);
+    private TextView status;
+
+    private final int cyan =
+            Color.rgb(0, 229, 255);
 
     @Override
     protected void onCreate(Bundle b) {
         super.onCreate(b);
 
-        if (android.os.Build.VERSION.SDK_INT >= 23 &&
-            checkSelfPermission(Manifest.permission.RECORD_AUDIO)
-            != PackageManager.PERMISSION_GRANTED) {
+        buildUI();
+
+        if (Build.VERSION.SDK_INT >= 23 &&
+                checkSelfPermission(
+                        Manifest.permission.RECORD_AUDIO
+                ) != PackageManager.PERMISSION_GRANTED) {
 
             requestPermissions(
-                new String[]{Manifest.permission.RECORD_AUDIO},
-                1001
+                    new String[]{
+                            Manifest.permission.RECORD_AUDIO
+                    },
+                    100
             );
         }
 
-        buildUI();
+        if (Build.VERSION.SDK_INT >= 33 &&
+                checkSelfPermission(
+                        Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED) {
+
+            requestPermissions(
+                    new String[]{
+                            Manifest.permission.POST_NOTIFICATIONS
+                    },
+                    101
+            );
+        }
     }
 
-    TextView tv(String text, float size, int color) {
-        TextView t = new TextView(this);
-        t.setText(text);
-        t.setTextSize(size);
-        t.setTextColor(color);
-        t.setPadding(18,12,18,12);
-        return t;
+    private TextView label(String text) {
+        TextView v =
+                new TextView(this);
+
+        v.setText(text);
+        v.setTextColor(cyan);
+        v.setTextSize(13);
+        v.setPadding(0, 14, 0, 5);
+
+        return v;
     }
 
-    Button button(String text) {
-        Button b = new Button(this);
+    private EditText field(
+            String hint,
+            String value,
+            boolean password
+    ) {
+        EditText e =
+                new EditText(this);
+
+        e.setHint(hint);
+        e.setText(value);
+        e.setTextColor(Color.WHITE);
+        e.setHintTextColor(
+                Color.rgb(130, 145, 155)
+        );
+
+        if (password) {
+            e.setInputType(
+                    android.text.InputType.TYPE_CLASS_TEXT |
+                            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            );
+        }
+
+        e.setPadding(
+                18, 8, 18, 8
+        );
+
+        return e;
+    }
+
+    private Button button(
+            String text
+    ) {
+        Button b =
+                new Button(this);
+
         b.setText(text);
-        b.setTextColor(white);
-        b.setTextSize(12);
-        b.setAllCaps(false);
-        b.setBackgroundColor(Color.rgb(24,34,45));
+        b.setTextColor(Color.WHITE);
+
         return b;
     }
 
-    void buildUI() {
+    private void buildUI() {
 
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(4,7,11));
+        ScrollView scroll =
+                new ScrollView(this);
 
-        ScrollView scroll = new ScrollView(this);
+        LinearLayout root =
+                new LinearLayout(this);
 
-        LinearLayout page = new LinearLayout(this);
-        page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(14,14,14,24);
+        root.setOrientation(
+                LinearLayout.VERTICAL
+        );
 
-        LinearLayout brand =
-            new LinearLayout(this);
+        root.setPadding(
+                28, 30, 28, 35
+        );
 
-        brand.setGravity(Gravity.CENTER_VERTICAL);
-        brand.setPadding(4, 4, 4, 8);
+        root.setBackgroundColor(
+                Color.rgb(4, 8, 12)
+        );
 
         ImageView logo =
-            new ImageView(this);
+                new ImageView(this);
 
         logo.setImageResource(
-            com.veer.maya.R.drawable.maya_logo
+                com.veer.maya.R.drawable.maya_logo
         );
 
-        brand.addView(
-            logo,
-            new LinearLayout.LayoutParams(
-                dp(58),
-                dp(58)
-            )
-        );
-
-        LinearLayout brandText =
-            new LinearLayout(this);
-
-        brandText.setOrientation(
-            LinearLayout.VERTICAL
+        root.addView(
+                logo,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        150
+                )
         );
 
         TextView title =
-            tv("MAYA", 30, white);
+                new TextView(this);
 
-        title.setTypeface(
-            Typeface.create(
-                Typeface.DEFAULT,
-                Typeface.BOLD
-            )
+        title.setText(
+                "M A Y A"
         );
 
-        brandText.addView(title);
+        title.setGravity(
+                Gravity.CENTER
+        );
+
+        title.setTextColor(
+                Color.WHITE
+        );
+
+        title.setTextSize(30);
+
+        root.addView(title);
 
         TextView sub =
-            tv(
-                "VOICE • BRAIN • AGENT • MEMORY",
-                11,
-                cyan
-            );
+                new TextView(this);
 
-        brandText.addView(sub);
-
-        brand.addView(
-            brandText,
-            new LinearLayout.LayoutParams(
-                -1,
-                -2
-            )
+        sub.setText(
+                "AI BRAIN  •  VOICE  •  MEMORY  •  ANDROID AGENT"
         );
 
-        page.addView(brand);
-
-        hud = new HudView();
-        page.addView(
-            hud,
-            new LinearLayout.LayoutParams(
-                -1,
-                dp(280)
-            )
+        sub.setGravity(
+                Gravity.CENTER
         );
+
+        sub.setTextColor(cyan);
+        sub.setTextSize(11);
+
+        root.addView(sub);
 
         status =
-            tv("HELLO BOSS • READY", 14, cyan);
+                new TextView(this);
 
-        status.setGravity(Gravity.CENTER);
-        page.addView(status);
-
-        response =
-            tv("MAYA online.\nSay: Hello Boss", 15, white);
-
-        response.setBackgroundColor(panel);
-        page.addView(response);
-
-        input =
-            new EditText(this);
-
-        input.setHint(
-            "Type a command…"
+        status.setText(
+                "● MAYA READY"
         );
 
-        input.setHintTextColor(muted);
-        input.setTextColor(white);
-        input.setSingleLine(false);
-        input.setBackgroundColor(panel);
-
-        page.addView(input);
-
-        Button send =
-            button("SEND COMMAND");
-
-        page.addView(send);
-
-        Button voice =
-            button("START HELLO BOSS / MAYA LIVE VOICE");
-
-        page.addView(voice);
-
-        Button popupPermission =
-            button("ENABLE MAYA LIVE POPUP");
-
-        page.addView(popupPermission);
-
-        Button accessibility =
-            button("ANDROID AGENT / ACCESSIBILITY");
-
-        page.addView(accessibility);
-
-        TextView settingsTitle =
-            tv("AI CONNECTION",18,white);
-
-        page.addView(settingsTitle);
-
-        api = new EditText(this);
-        api.setHint("API Key");
-        api.setHintTextColor(muted);
-        api.setTextColor(white);
-        api.setSingleLine(true);
-        api.setInputType(129);
-        api.setText(
-            MayaCore.getApi(this)
+        status.setGravity(
+                Gravity.CENTER
         );
 
-        page.addView(api);
-
-        endpoint = new EditText(this);
-        endpoint.setHint("API Endpoint");
-        endpoint.setHintTextColor(muted);
-        endpoint.setTextColor(white);
-        endpoint.setSingleLine(true);
-        endpoint.setText(
-            MayaCore.getEndpoint(this)
+        status.setTextColor(
+                Color.rgb(0, 255, 180)
         );
 
-        page.addView(endpoint);
+        status.setTextSize(14);
 
-        model = new EditText(this);
-        model.setHint("Model");
-        model.setHintTextColor(muted);
-        model.setTextColor(white);
-        model.setSingleLine(true);
-        model.setText(
-            MayaCore.getModel(this)
+        root.addView(
+                status,
+                new LinearLayout.LayoutParams(
+                        -1,
+                        65
+                )
         );
 
-        page.addView(model);
+        root.addView(
+                label("AI PROVIDER")
+        );
+
+        RadioGroup providers =
+                new RadioGroup(this);
+
+        providers.setOrientation(
+                RadioGroup.HORIZONTAL
+        );
+
+        geminiRadio =
+                new RadioButton(this);
+
+        geminiRadio.setText("Gemini");
+        geminiRadio.setTextColor(Color.WHITE);
+
+        openAIRadio =
+                new RadioButton(this);
+
+        openAIRadio.setText("OpenAI");
+        openAIRadio.setTextColor(Color.WHITE);
+
+        providers.addView(geminiRadio);
+        providers.addView(openAIRadio);
+
+        geminiRadio.setChecked(true);
+
+        root.addView(providers);
+
+        root.addView(
+                label("GEMINI API TOKEN")
+        );
+
+        geminiKey =
+                field(
+                        "Paste Gemini API Token",
+                        MayaCore.getGeminiKey(this),
+                        true
+                );
+
+        root.addView(geminiKey);
+
+        root.addView(
+                label("GEMINI MODEL")
+        );
+
+        geminiModel =
+                field(
+                        "Gemini model",
+                        MayaCore.getGeminiModel(this),
+                        false
+                );
+
+        root.addView(geminiModel);
+
+        root.addView(
+                label("OPENAI API TOKEN")
+        );
+
+        openAIKey =
+                field(
+                        "Paste OpenAI API Token",
+                        MayaCore.getOpenAIKey(this),
+                        true
+                );
+
+        root.addView(openAIKey);
+
+        root.addView(
+                label("OPENAI MODEL")
+        );
+
+        openAIModel =
+                field(
+                        "Your available OpenAI API model",
+                        MayaCore.getOpenAIModel(this),
+                        false
+                );
+
+        root.addView(openAIModel);
 
         Button save =
-            button("SAVE API SETTINGS");
+                button(
+                        "SAVE API SETTINGS"
+                );
 
-        page.addView(save);
+        save.setOnClickListener(v -> {
 
-        Button test =
-            button("TEST API CONNECTION");
+            String provider =
+                    geminiRadio.isChecked()
+                            ? "Gemini"
+                            : "OpenAI";
 
-        page.addView(test);
+            MayaCore.saveSettings(
+                    this,
+                    geminiKey.getText().toString(),
+                    geminiModel.getText().toString(),
+                    openAIKey.getText().toString(),
+                    openAIModel.getText().toString(),
+                    provider
+            );
 
-        Button update =
-            button("CHECK FOR MAYA UPDATE");
-
-        page.addView(update);
-
-        scroll.addView(page);
-        root.addView(scroll);
-
-        setContentView(root);
-
-        send.setOnClickListener(v -> {
-
-            String text =
-                input.getText().toString().trim();
-
-            if (text.isEmpty()) return;
-
-            setState("THINKING");
-
-            MayaCore.ask(
-                this,
-                text,
-                (ok, answer) -> runOnUiThread(() -> {
-
-                    response.setText(answer);
-
-                    setState(
-                        ok
-                        ? "COMPLETED"
-                        : "ERROR"
-                    );
-                })
+            status.setText(
+                    "● SETTINGS SAVED"
             );
         });
 
-        voice.setOnClickListener(v -> {
+        root.addView(save);
 
-            setState("AWAKENED");
-
-            Intent i =
-                new Intent(
-                    this,
-                    MayaVoiceService.class
+        Button test =
+                button(
+                        "TEST SELECTED AI"
                 );
 
-            if (android.os.Build.VERSION.SDK_INT >= 26) {
+        test.setOnClickListener(v -> {
+
+            status.setText(
+                    "● TESTING AI..."
+            );
+
+            MayaCore.ask(
+                    this,
+                    "Reply with exactly: MAYA ONLINE",
+                    (ok, answer) -> runOnUiThread(() -> {
+
+                        status.setText(
+                                ok
+                                        ? "● AI ONLINE"
+                                        : "● AI ERROR"
+                        );
+
+                        Toast.makeText(
+                                this,
+                                answer,
+                                Toast.LENGTH_LONG
+                        ).show();
+                    })
+            );
+        });
+
+        root.addView(test);
+
+        root.addView(
+                label("VOICE & ANDROID AGENT")
+        );
+
+        Button voice =
+                button(
+                        "START HELLO BOSS / MAYA LIVE VOICE"
+                );
+
+        voice.setOnClickListener(v -> {
+
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    checkSelfPermission(
+                            Manifest.permission.RECORD_AUDIO
+                    ) != PackageManager.PERMISSION_GRANTED) {
+
+                requestPermissions(
+                        new String[]{
+                                Manifest.permission.RECORD_AUDIO
+                        },
+                        200
+                );
+
+                return;
+            }
+
+            Intent i =
+                    new Intent(
+                            this,
+                            MayaVoiceService.class
+                    );
+
+            if (Build.VERSION.SDK_INT >= 26) {
                 startForegroundService(i);
             } else {
                 startService(i);
             }
 
-            Toast.makeText(
-                this,
-                "MAYA Live Voice Started",
-                Toast.LENGTH_SHORT
-            ).show();
+            status.setText(
+                    "● MAYA VOICE ACTIVE"
+            );
         });
 
-        popupPermission.setOnClickListener(v -> {
+        root.addView(voice);
 
-            try {
+        Button overlay =
+                button(
+                        "ENABLE MAYA FLOATING POPUP"
+                );
 
-                Intent overlay =
-                    new Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse(
-                            "package:" + getPackageName()
-                        )
-                    );
+        overlay.setOnClickListener(v -> {
 
-                startActivity(overlay);
+            if (Build.VERSION.SDK_INT >= 23 &&
+                    !Settings.canDrawOverlays(this)) {
 
-            } catch (Exception e) {
-
-                try {
-                    startActivity(
+                Intent i =
                         new Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION
-                        )
-                    );
-                } catch (Exception ignored) {}
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse(
+                                        "package:" +
+                                                getPackageName()
+                                )
+                        );
+
+                startActivity(i);
+
+            } else {
+                Toast.makeText(
+                        this,
+                        "MAYA overlay already enabled",
+                        Toast.LENGTH_SHORT
+                ).show();
             }
         });
+
+        root.addView(overlay);
+
+        Button accessibility =
+                button(
+                        "ENABLE MAYA ANDROID ACCESSIBILITY AGENT"
+                );
 
         accessibility.setOnClickListener(v -> {
 
-            try {
-                startActivity(
+            Intent i =
                     new Intent(
-                        Settings.ACTION_ACCESSIBILITY_SETTINGS
-                    )
-                );
-            } catch (Exception ignored) {}
+                            Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    );
+
+            startActivity(i);
         });
 
-        save.setOnClickListener(v -> {
+        root.addView(accessibility);
 
-            MayaCore.saveApi(
-                this,
-                api.getText().toString()
-            );
+        Button memory =
+                button(
+                        "CLEAR MAYA MEMORY"
+                );
 
-            MayaCore.saveEndpoint(
-                this,
-                endpoint.getText().toString()
-            );
+        memory.setOnClickListener(v -> {
 
-            MayaCore.saveModel(
-                this,
-                model.getText().toString()
-            );
+            MayaMemory.clear(this);
 
             Toast.makeText(
-                this,
-                "API SETTINGS SAVED",
-                Toast.LENGTH_SHORT
+                    this,
+                    "MAYA memory cleared",
+                    Toast.LENGTH_SHORT
             ).show();
-
-            setState("READY");
         });
 
-        test.setOnClickListener(v -> {
+        root.addView(memory);
 
-            setState("VERIFYING");
+        TextView help =
+                new TextView(this);
 
-            MayaCore.ask(
-                this,
-                "Reply with exactly: MAYA API OK",
-                (ok, answer) -> runOnUiThread(() -> {
-
-                    response.setText(answer);
-
-                    Toast.makeText(
-                        this,
-                        ok
-                        ? "API CONNECTION OK"
-                        : "API CONNECTION FAILED",
-                        Toast.LENGTH_LONG
-                    ).show();
-
-                    setState(
-                        ok
-                        ? "COMPLETED"
-                        : "ERROR"
-                    );
-                })
-            );
-        });
-
-        update.setOnClickListener(v ->
-            checkUpdate()
+        help.setText(
+                "\nVOICE EXAMPLES\n\n" +
+                "Hello Boss\n" +
+                "Hello Maya\n" +
+                "MAYA YouTube खोलो\n" +
+                "MAYA Chrome खोलो\n" +
+                "MAYA वापस जाओ\n" +
+                "MAYA home जाओ\n" +
+                "MAYA 98XXXXXXXX को call लगाओ\n" +
+                "MAYA मुझे समझाओ...\n"
         );
-    }
 
-    void setState(String s) {
-        status.setText(s);
-        hud.state = s;
-        hud.invalidate();
-    }
-
-    void checkUpdate() {
-
-        new Thread(() -> {
-
-            try {
-
-                URL u = new URL(
-                    "https://api.github.com/repos/" +
-                    "MONSTERROWDY/Maya---controller/releases/latest"
-                );
-
-                HttpURLConnection c =
-                    (HttpURLConnection)u.openConnection();
-
-                c.setRequestProperty(
-                    "Accept",
-                    "application/vnd.github+json"
-                );
-
-                c.setConnectTimeout(10000);
-                c.setReadTimeout(10000);
-
-                Scanner sc =
-                    new Scanner(c.getInputStream())
-                    .useDelimiter("\\A");
-
-                String raw =
-                    sc.hasNext() ? sc.next() : "";
-
-                JSONObject j =
-                    new JSONObject(raw);
-
-                String tag =
-                    j.optString("tag_name","");
-
-                runOnUiThread(() -> {
-
-                    Toast.makeText(
-                        this,
-                        tag.isEmpty()
-                        ? "No release found"
-                        : "Latest MAYA: " + tag,
-                        Toast.LENGTH_LONG
-                    ).show();
-                });
-
-            } catch (Exception e) {
-
-                runOnUiThread(() ->
-                    Toast.makeText(
-                        this,
-                        "Update check failed",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                );
-            }
-
-        }).start();
-    }
-
-    int dp(int n) {
-        return (int)(
-            n * getResources()
-            .getDisplayMetrics()
-            .density
+        help.setTextColor(
+                Color.LTGRAY
         );
-    }
 
-    class HudView extends View {
+        help.setTextSize(14);
 
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        String state = "READY";
-        float pulse = 0;
+        root.addView(help);
 
-        HudView() {
-            super(MainActivity.this);
-            p.setTypeface(
-                Typeface.create(
-                    Typeface.DEFAULT,
-                    Typeface.BOLD
-                )
-            );
+        scroll.addView(root);
 
-            handler.post(new Runnable() {
-                @Override
-                public void run() {
-                    pulse += 0.05f;
-                    invalidate();
-                    handler.postDelayed(this, 40);
-                }
-            });
-        }
-
-        @Override
-        protected void onDraw(Canvas c) {
-
-            super.onDraw(c);
-
-            float cx = getWidth()/2f;
-            float cy = getHeight()/2f;
-
-            p.setStyle(Paint.Style.STROKE);
-            p.setStrokeWidth(2);
-
-            p.setColor(
-                Color.rgb(35,100,130)
-            );
-
-            for (int i=0;i<5;i++) {
-
-                float r =
-                    48 + i*25 +
-                    (float)Math.sin(
-                        pulse+i
-                    )*4;
-
-                c.drawCircle(
-                    cx,
-                    cy,
-                    r,
-                    p
-                );
-            }
-
-            p.setStyle(Paint.Style.FILL);
-
-            p.setColor(
-                Color.rgb(35,130,170)
-            );
-
-            c.drawCircle(
-                cx,
-                cy,
-                40 + (float)Math.sin(pulse)*4,
-                p
-            );
-
-            p.setColor(Color.BLACK);
-
-            c.drawCircle(
-                cx,
-                cy,
-                28,
-                p
-            );
-
-            p.setColor(cyan);
-
-            p.setTextSize(13);
-
-            String s = state;
-
-            float w =
-                p.measureText(s);
-
-            c.drawText(
-                s,
-                cx-w/2,
-                cy+5,
-                p
-            );
-
-            p.setTextSize(9);
-            p.setColor(muted);
-
-            String info =
-                "MAYA • ANDROID AI CORE";
-
-            float iw =
-                p.measureText(info);
-
-            c.drawText(
-                info,
-                cx-iw/2,
-                getHeight()-18,
-                p
-            );
-        }
+        setContentView(scroll);
     }
 }

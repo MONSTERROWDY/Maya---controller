@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">MAYA</string>
-    <string name="accessibility_description">MAYA Android Agent</string>
+    <string name="accessibility_description">MAYA Android Control Agent</string>
 </resources>

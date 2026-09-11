@@ -2,7 +2,8 @@
 build/
 app/build/
 local.properties
-*.jks
+*.iml
+.idea/
+.DS_Store
 *.keystore
-.env
-*.log
+*.jks
