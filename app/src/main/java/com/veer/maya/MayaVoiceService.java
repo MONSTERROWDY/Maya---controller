@@ -237,7 +237,7 @@ public class MayaVoiceService extends Service {
 
                     processing = false;
 
-                    runOnUiThread(() -> {
+                    new android.os.Handler(getMainLooper()).post(() -> {
                         updatePopup(
                                 userText,
                                 answer
@@ -327,7 +327,7 @@ public class MayaVoiceService extends Service {
     private void showCallConfirmation(String number) {
         if (!popupShowing) showPopup();
 
-        runOnUiThread(() -> {
+        new android.os.Handler(getMainLooper()).post(() -> {
             Button call =
                     new Button(this);
 
@@ -353,7 +353,7 @@ public class MayaVoiceService extends Service {
     private void speak(String text) {
         if (tts == null) return;
 
-        runOnUiThread(() -> {
+        new android.os.Handler(getMainLooper()).post(() -> {
             setStatus("● SPEAKING");
 
             tts.speak(
@@ -416,7 +416,7 @@ public class MayaVoiceService extends Service {
     }
 
     private void setStatus(String status) {
-        runOnUiThread(() -> {
+        new android.os.Handler(getMainLooper()).post(() -> {
             if (popupStatus != null) {
                 popupStatus.setText(status);
             }

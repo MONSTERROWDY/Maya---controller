@@ -607,4 +607,26 @@ public class MayaCore {
         return m.group(1)
                 .replaceAll("[^0-9+]", "");
     }
+
+    // Compatibility methods for MayaCommandReceiver.
+    // Pending commands are handled by the accessibility agent.
+    public static void confirmPending(Context c) {
+        String command = MayaCommandReceiver.takePendingCommand(c);
+
+        if (command == null || command.trim().isEmpty()) {
+            return;
+        }
+
+        MayaAccessibilityService service =
+                MayaAccessibilityService.getInstance();
+
+        if (service != null) {
+            service.executeCommand(command.trim());
+        }
+    }
+
+    public static void cancelPending(Context c) {
+        MayaCommandReceiver.takePendingCommand(c);
+    }
+
 }
